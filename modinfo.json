@@ -1,0 +1,12 @@
+﻿{
+  "type": "code",
+  "name": "Serv-a-Map",
+  "description": "Creates a map you can view online!",
+  "authors": [
+    "VeryGoodDog"
+  ],
+  "version": "0.0.1",
+  "dependencies": {
+    "game": "1.18.5"
+  }
+}

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <ProjectGuid>{0287E0DF-B785-40E8-BB50-2D684B45FC61}</ProjectGuid>
+        <OutputType>Library</OutputType>
+        <RootNamespace>ServerMap</RootNamespace>
+        <TargetFramework>net48</TargetFramework>
+        <LangVersion>10</LangVersion>
+        <VintageStoryInstall>\home\ah\Documents\devStuff\vintagestory\vsdevdirs\serv_automap</VintageStoryInstall>
+        <PackageId>ServaMap</PackageId>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>full</DebugType>
+        <Optimize>false</Optimize>
+        <OutputPath>bin\Debug</OutputPath>
+        <DefineConstants>DEBUG;</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+        <ConsolePause>false</ConsolePause>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <Optimize>true</Optimize>
+        <OutputPath>bin\Release</OutputPath>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+        <ConsolePause>false</ConsolePause>
+    </PropertyGroup>
+    <ItemGroup>
+        <!--    <Reference Include="System" />-->
+        <Reference Include="System.Data.SQLite">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Lib\System.Data.SQLite.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="System.Drawing.Primitives"/>
+        <Reference Include="VintagestoryAPI">
+            <HintPath>\home\ah\ApplicationData\vintagestory\VintagestoryAPI.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="VintagestoryLib">
+            <HintPath>\home\ah\ApplicationData\vintagestory\VintagestoryLib.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="VSCreativeMod">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Mods\VSCreativeMod.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="VSEssentials">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Mods\VSEssentials.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="VSSurvivalMod">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Mods\VSSurvivalMod.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="System.Drawing"/>
+        <Reference Include="System.Web"/>
+        <Reference Include="protobuf-net">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Lib\protobuf-net.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Pngcs">
+            <HintPath>..\..\Pngcs.dll</HintPath>
+        </Reference>
+        <Reference Include="System.Xml"/>
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="0Harmony">
+            <HintPath>\home\ah\ApplicationData\vintagestory\Lib\0Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+    </ItemGroup>
+
+    <Target Name="CustomAfterBuild" AfterTargets="Build">
+        <MakeDir Directories="$(VintageStoryInstall)\Mods\$(AssemblyName)"/>
+        <Exec Command="cp -r $(OutputPath)* $(VintageStoryInstall)/Mods/$(AssemblyName)"/>
+    </Target>
+    <ItemGroup>
+        <None Include="modinfo.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+    <!--  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />-->
+</Project>
