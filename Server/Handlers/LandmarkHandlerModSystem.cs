@@ -12,36 +12,11 @@ using Vintagestory.API.Server;
 
 namespace ServaMap.Server;
 
-public class LandmarkHandlerModSystem : DatabaseHandlerModSystem {
+public class LandmarkHandlerModSystem : DatabaseHandlerModSystem<Landmark> {
 	public override string TableName => "landmarks";
 
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
-
-		serverAPI.Event.RegisterGameTickListener(OnGameTick,
-				config.GeoJsonAutoExportIntervalSeconds * 1000);
-
-		try {
-			InitializeDatabase();
-			using (var command = conn.CreateCommand()) {
-				command.CommandText = @$"
-CREATE TABLE IF NOT EXISTS {TableName}
-(
-    x UNIQUE,
-    y UNIQUE,
-    z UNIQUE,
-    label NOT NULL,
-    type NOT NULL,
-    creator_id UNIQUE
-)
-";
-				command.ExecuteNonQuery();
-			}
-		}
-		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to open the landmark database:");
-			logger.Error(e.ToString());
-		}
 
 		var parsers = serverAPI.ChatCommands.Parsers;
 
@@ -71,35 +46,50 @@ CREATE TABLE IF NOT EXISTS {TableName}
 								.WithDesc("Remove a landmark in the server's map.")
 								.WithArgs(parsers.OptionalWorldPosition("position"))
 								.HandleWith(LandmarkForceDeleteHandler));
+
+		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
+				config.GeoJsonAutoExportIntervalSeconds * 1000);
+
+		InitializeLandmarkDatabase();
 	}
 
-	private void OnGameTick(float _) {
+	private void InitializeLandmarkDatabase() {
 		try {
-			WriteGeoJson();
+			InitializeDatabase();
+			using (var command = conn.CreateCommand()) {
+				command.CommandText = @$"
+CREATE TABLE IF NOT EXISTS {TableName}
+(
+    x UNIQUE,
+    y UNIQUE,
+    z UNIQUE,
+    label NOT NULL,
+    type NOT NULL,
+    creator_id UNIQUE
+)
+";
+				command.ExecuteNonQuery();
+			}
 		}
 		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to export landmark GeoJSON!");
-			logger.Error(e);
-		}
-	}
-
-	public bool ProcessLandmark(Landmark landmark) {
-		try {
-			logger.Notification($"Processing landmark: {landmark.Pos} {landmark.Label}");
-			if (!ShouldUpdateLandmark(landmark))
-				return true;
-			UpdateLandmark(landmark);
-		}
-		catch (Exception e) {
-			logger.Error($"Serv-a-Map failed to update a landmark: {landmark.Pos} {landmark.Label}");
+			logger.Error("Serv-a-Map failed to open the landmark database:");
 			logger.Error(e.ToString());
-			return false;
 		}
-		return true;
 	}
 
-	private bool ShouldUpdateLandmark(Landmark landmark) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> ProcessFeature(Landmark landmark) {
+		var shouldUpdate = ShouldUpdate(landmark);
+		if (shouldUpdate.IsException)
+			return shouldUpdate;
+		var update = Update(landmark);
+		if (update.IsGood)
+			return true;
+		return update;
+	}
+
+	public override Result<bool> ShouldUpdate(Landmark landmark) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 SELECT * FROM {TableName}
 WHERE x = $x
@@ -120,10 +110,16 @@ WHERE x = $x
 			var reader = command.ExecuteReader();
 			return !reader.HasRows;
 		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to test if a landmark should update.");
+			logger.Error(e.ToString());
+			return e;
+		}
 	}
 
-	private void UpdateLandmark(Landmark landmark) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> Update(Landmark landmark) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 INSERT OR REPLACE INTO {TableName}
 VALUES ($x, $y, $z, $label, $type, $creator_id)
@@ -136,12 +132,49 @@ VALUES ($x, $y, $z, $label, $type, $creator_id)
 			command.Parameters.AddWithValue("$type", landmark.Type);
 
 			command.Parameters.AddWithValue("$creator_id", landmark.CreatorId);
-			command.ExecuteNonQuery();
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to update a landmark.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
-	private List<Landmark> ListLandmarks(string playerUid) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> Delete(Landmark toDelete) {
+		try {
+			using var command = conn.CreateCommand();
+			if (toDelete.CreatorId == "") {
+				command.CommandText = @$"
+DELETE FROM {TableName}
+WHERE x = $x AND y = $y AND z = $z
+";
+			}
+			else {
+				command.CommandText = @$"
+DELETE FROM {TableName}
+WHERE x = $x AND y = $y AND z = $z AND creator_id = $creator_id
+";
+				command.Parameters.AddWithValue("$creator_id", toDelete.CreatorId);
+			}
+
+			command.Parameters.AddWithValue("$x", toDelete.Pos.X);
+			command.Parameters.AddWithValue("$y", toDelete.Pos.Y);
+			command.Parameters.AddWithValue("$z", toDelete.Pos.Z);
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to delete a landmark.");
+			logger.Error(e.ToString());
+			return e;
+		}
+	}
+
+	private Result<List<Landmark>> ListLandmarks(string playerUid) {
+		try {
+			using var command = conn.CreateCommand();
 			if (playerUid is "") {
 				command.CommandText = @$"
 SELECT * FROM {TableName}
@@ -169,70 +202,56 @@ WHERE creator_id = $creator_id
 			}
 			return landmarks;
 		}
-	}
-
-	private bool DeleteLandmark(Landmark toDelete, bool force = false) {
-		using (var command = conn.CreateCommand()) {
-			if (force) {
-				command.CommandText = @$"
-DELETE FROM {TableName}
-WHERE x = $x AND y = $y AND z = $z
-";
-			}
-			else {
-				command.CommandText = @$"
-DELETE FROM {TableName}
-WHERE x = $x AND y = $y AND z = $z AND creator_id = $creator_id
-";
-				command.Parameters.AddWithValue("$creator_id", toDelete.CreatorId);
-			}
-
-			command.Parameters.AddWithValue("$x", toDelete.Pos.X);
-			command.Parameters.AddWithValue("$y", toDelete.Pos.Y);
-			command.Parameters.AddWithValue("$z", toDelete.Pos.Z);
-			var rowsAffected = command.ExecuteNonQuery();
-			return rowsAffected > 0;
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to list landmarks.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
-	public void WriteGeoJson() {
-		using (var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8)) {
-			using (var writer = new JsonTextWriter(stream)) {
-				writer.Formatting = Formatting.None;
-				writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
-				writer.WriteObject(() => {
-					writer.WriteObject("crs",
-									() => {
-										writer.WriteObject("properties",
-														() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
-												.WriteKeyValue("type", "name");
-									})
-							.WriteArray("features",
-									() => WriteFeatures(reader => {
-										var x = reader.GetInt32(0);
-										var y = reader.GetInt32(1);
-										var z = reader.GetInt32(2);
-										var label = reader.GetString(3);
-										var type = reader.GetString(4);
-										writer.WriteObject(() => {
-											writer.WriteObject("geometry",
-															() => {
-																writer.WriteArray("coordinates", x, z)
-																		.WriteKeyValue("type", "Point");
-															})
-													.WriteObject("properties",
-															() => {
-																writer.WriteKeyValue("label", label)
-																		.WriteKeyValue("type", type)
-																		.WriteKeyValue("z", y);
-															})
-													.WriteKeyValue("type", "Feature");
-										});
-									}))
-							.WriteKeyValue("name", "traders")
-							.WriteKeyValue("type", "FeatureCollection");
-				});
-			}
+	public Exception WriteGeoJson() {
+		try {
+			using var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8);
+			using var writer = new JsonTextWriter(stream);
+			writer.Formatting = Formatting.None;
+			writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
+			writer.WriteObject(() => {
+				writer.WriteObject("crs",
+								() => {
+									writer.WriteObject("properties",
+													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
+											.WriteKeyValue("type", "name");
+								})
+						.WriteArray("features",
+								() => WriteFeatures(reader => {
+									var x = reader.GetInt32(0);
+									var y = reader.GetInt32(1);
+									var z = reader.GetInt32(2);
+									var label = reader.GetString(3);
+									var type = reader.GetString(4);
+									writer.WriteObject(() => {
+										writer.WriteObject("geometry",
+														() => {
+															writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
+														})
+												.WriteObject("properties",
+														() => {
+															writer.WriteKeyValue("label", label)
+																	.WriteKeyValue("type", type)
+																	.WriteKeyValue("z", y);
+														})
+												.WriteKeyValue("type", "Feature");
+									});
+								}))
+						.WriteKeyValue("name", "traders")
+						.WriteKeyValue("type", "FeatureCollection");
+			});
+			return null;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to export landmark GeoJSON.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
@@ -241,19 +260,25 @@ WHERE x = $x AND y = $y AND z = $z AND creator_id = $creator_id
 		var type = args[0] as string;
 		var label = args[1] as string;
 		var creatorId = args.Caller.Player.PlayerUID;
-		var res = ProcessLandmark(new Landmark {
+		var res = ProcessFeature(new Landmark {
 			Pos = pos, Type = type, Label = label, CreatorId = creatorId
 		});
-		return res
-				? TextCommandResult.Success("Added/updated landmark.")
-				: TextCommandResult.Error("Failed to add/update landmark.");
+		return res.IsGood
+				? res.Good
+						? TextCommandResult.Success("Added/updated landmark.")
+						: TextCommandResult.Success("Landmark was not modified.")
+				: TextCommandResult.Error("Failed to process landmark.");
 	}
 
 	private TextCommandResult ListLandmarksHandler(TextCommandCallingArgs args) {
 		var usingCallerUid = args.Parsers[0].IsMissing;
 		var uid = usingCallerUid ? args.Caller.Player.PlayerUID : args[0] as string;
 
-		var landmarks = ListLandmarks(uid);
+		var landmarksRes = ListLandmarks(uid);
+		if (landmarksRes.IsException)
+			return TextCommandResult.Error("An error occured while trying to list landmarks.");
+		var landmarks = landmarksRes.Good;
+
 		var count = landmarks.Count;
 
 		var response = new StringBuilder();
@@ -287,26 +312,29 @@ WHERE x = $x AND y = $y AND z = $z AND creator_id = $creator_id
 
 	private TextCommandResult LandmarkDeleteHandler(TextCommandCallingArgs args) {
 		var pos = (args[0] as Vec3d).AsBlockPos.ToLocalPosition(serverAPI);
-		var res = DeleteLandmark(new Landmark {
+		var res = Delete(new Landmark {
 			Pos = pos, CreatorId = args.Caller.Player.PlayerUID
 		});
 
-		return res
-				? TextCommandResult.Success("Deleted landmark!")
-				: TextCommandResult.Error(
-						"Failed to delete the landmark. Did you type the coordinates right?");
+		return res.IsGood
+				? res.Good
+						? TextCommandResult.Success("Deleted landmark!")
+						: TextCommandResult.Success(
+								"Landmark was not deleted. Did you type the coordinates right?")
+				: TextCommandResult.Error("An error occured while trying to delete that landmark.");
 	}
 
 	private TextCommandResult LandmarkForceDeleteHandler(TextCommandCallingArgs args) {
-		var pos = (args[0] as Vec3d).AsBlockPos.ToVec3i();
-		var res = DeleteLandmark(new Landmark {
-					Pos = pos
-				},
-				true);
+		var pos = (args[0] as Vec3d).AsBlockPos.ToLocalPosition(serverAPI);
+		var res = Delete(new Landmark {
+			Pos = pos
+		});
 
-		return res
-				? TextCommandResult.Success("Deleted landmark!")
-				: TextCommandResult.Error(
-						"Failed to delete the landmark. Did you type the coordinates right?");
+		return res.IsGood
+				? res.Good
+						? TextCommandResult.Success("Deleted landmark!")
+						: TextCommandResult.Success(
+								"Landmark was not deleted. Did you type the coordinates right?")
+				: TextCommandResult.Error("An error occured while trying to delete that landmark.");
 	}
 }

@@ -42,7 +42,4 @@ public record ChunkShard {
 	// This is ignored because it's set by the server not the client.
 	[ProtoIgnore]
 	public string GeneratingPlayerId { get; set; }
-
-	[ProtoIgnore]
-	public bool IsInvalid => ChunkCoords is null || ShardImage is null;
 }

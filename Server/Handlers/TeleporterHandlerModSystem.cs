@@ -13,7 +13,7 @@ using Vintagestory.GameContent;
 namespace ServaMap.Server;
 
 // Handles teleporters and translocators
-public class TeleporterHandlerModSystem : DatabaseHandlerModSystem {
+public class TeleporterHandlerModSystem : DatabaseHandlerModSystem<Teleporter> {
 	public override string TableName => "teleporters";
 
 	public override void StartServerSide(ICoreServerAPI api) {
@@ -24,13 +24,29 @@ public class TeleporterHandlerModSystem : DatabaseHandlerModSystem {
 				ProcessBlockEntities(serverChunk.BlockEntities);
 		};
 
-		serverAPI.Event.BreakBlock +=
-				(IServerPlayer _, BlockSelection blockSelection, ref float _, ref EnumHandling _) =>
-						DeleteTeleporter(blockSelection.Position);
+		serverAPI.Event.BreakBlock += OnEventOnBreakBlock;
 
-		serverAPI.Event.RegisterGameTickListener(OnGameTick,
+		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
 
+		InitializeTeleporterDatabase();
+	}
+
+	private void OnEventOnBreakBlock(IServerPlayer serverPlayer, BlockSelection blockSelection,
+			ref float f, ref EnumHandling enumHandling) {
+		var pos = blockSelection.Position;
+		var blockEntity =
+				serverAPI.World.BlockAccessor.GetBlockEntity(pos) as BlockEntityTeleporterBase;
+
+		if (blockEntity is null)
+			return;
+
+		var res = Delete(new Teleporter {
+			Start = blockSelection.Position
+		});
+	}
+
+	private void InitializeTeleporterDatabase() {
 		try {
 			InitializeDatabase();
 			using (var command = conn.CreateCommand()) {
@@ -58,44 +74,14 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		}
 	}
 
-	private void DeleteTeleporter(BlockPos blockPos) {
-		using (var command = conn.CreateCommand()) {
-			command.CommandText = @$"
-DELETE FROM {TableName}
-WHERE (start_x = $start_x AND start_y = $start_y AND start_z = $start_z)
-   OR (end_x = $start_x AND end_y = $start_y AND end_z = $start_z)
-";
-			command.Parameters.AddWithValue("$start_x", blockPos.X);
-			command.Parameters.AddWithValue("$start_y", blockPos.Y);
-			command.Parameters.AddWithValue("$start_z", blockPos.Z);
-			command.ExecuteNonQuery();
-		}
-	}
-
-	private void OnGameTick(float _) {
-		try {
-			WriteGeoJson();
-		}
-		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to export teleporter GeoJSON!");
-			logger.Error(e);
-		}
-	}
-
-	public bool ProcessTeleporter(Teleporter teleporter) {
-		try {
-			logger.Notification($"Processing teleporter: {teleporter.Start} to {teleporter.End}");
-			if (!ShouldUpdateTeleporter(teleporter))
-				return true;
-			UpdateTeleporter(teleporter);
-		}
-		catch (Exception e) {
-			logger.Error(
-					$"Serv-a-Map failed to update a teleporter: {teleporter.Start} to {teleporter.End}");
-			logger.Error(e.ToString());
+	public override Result<bool> ProcessFeature(Teleporter teleporter) {
+		logger.Notification($"Processing teleporter: {teleporter.Start} to {teleporter.End}");
+		var shouldUpdateRes = ShouldUpdate(teleporter);
+		if (shouldUpdateRes.IsException)
+			return shouldUpdateRes;
+		if (!shouldUpdateRes.Good)
 			return false;
-		}
-		return true;
+		return Update(teleporter);
 	}
 
 	public void ProcessBlockEntities(Dictionary<BlockPos, BlockEntity> blockEntities) {
@@ -105,14 +91,13 @@ WHERE (start_x = $start_x AND start_y = $start_y AND start_z = $start_z)
 			var tele = blockEntity.Value as BlockEntityTeleporterBase;
 			if (tele is null)
 				continue;
-			ProcessTeleporter(new Teleporter {
-				Start = tele.Pos, End = tele.Target(), Label = "", Tag = ""
-			});
+			ProcessFeature(new Teleporter(tele));
 		}
 	}
 
-	private bool ShouldUpdateTeleporter(Teleporter teleporter) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> ShouldUpdate(Teleporter teleporter) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 SELECT * FROM {TableName}
 WHERE ((start_x = $start_x AND start_y = $start_y AND start_z = $start_z 
@@ -136,10 +121,16 @@ WHERE ((start_x = $start_x AND start_y = $start_y AND start_z = $start_z
 			// If the anything comes back, then there is an identical teleporter already there.
 			return !reader.HasRows;
 		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to test if a teleporter should update.");
+			logger.Error(e.ToString());
+			return e;
+		}
 	}
 
-	private void UpdateTeleporter(Teleporter teleporter) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> Update(Teleporter teleporter) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 INSERT OR REPLACE INTO {TableName}
 VALUES ($start_x, $start_y, $start_z, $end_x, $end_y, $end_z, $label, $tag)
@@ -154,59 +145,92 @@ VALUES ($start_x, $start_y, $start_z, $end_x, $end_y, $end_z, $label, $tag)
 
 			command.Parameters.AddWithValue("$label", teleporter.Label);
 			command.Parameters.AddWithValue("$tag", teleporter.Tag);
-			command.ExecuteNonQuery();
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to update a teleporter.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
-	public void WriteGeoJson() {
-		using (var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8)) {
-			using (var writer = new JsonTextWriter(stream)) {
-				writer.Formatting = Formatting.None;
-				writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
-				writer.WriteObject(() => {
-					writer.WriteObject("crs",
-									() => {
-										writer.WriteObject("properties",
-														() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
-												.WriteKeyValue("type", "name");
-									})
-							.WriteArray("features",
-									() => WriteFeatures(reader => {
-										var start_x = reader.GetInt32(0);
-										var start_y = reader.GetInt32(1);
-										var start_z = reader.GetInt32(2);
+	public override Result<bool> Delete(Teleporter teleporter) {
+		try {
+			using var command = conn.CreateCommand();
+			command.CommandText = @$"
+DELETE FROM {TableName}
+WHERE (start_x = $start_x AND start_y = $start_y AND start_z = $start_z)
+   OR (end_x = $start_x AND end_y = $start_y AND end_z = $start_z)
+";
+			command.Parameters.AddWithValue("$start_x", teleporter.Start.X);
+			command.Parameters.AddWithValue("$start_y", teleporter.Start.Y);
+			command.Parameters.AddWithValue("$start_z", teleporter.Start.Z);
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to delete a teleporter.");
+			logger.Error(e.ToString());
+			return e;
+		}
+	}
 
-										var end_x = reader.GetInt32(3);
-										var end_y = reader.GetInt32(4);
-										var end_z = reader.GetInt32(5);
+	public Exception WriteGeoJson() {
+		try {
+			using var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8);
+			using var writer = new JsonTextWriter(stream);
+			writer.Formatting = Formatting.None;
+			writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
+			writer.WriteObject(() => {
+				writer.WriteObject("crs",
+								() => {
+									writer.WriteObject("properties",
+													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
+											.WriteKeyValue("type", "name");
+								})
+						.WriteArray("features",
+								() => WriteFeatures(reader => {
+									var start_x = reader.GetInt32(0);
+									var start_y = reader.GetInt32(1);
+									var start_z = reader.GetInt32(2);
 
-										var label = reader.GetString(6);
-										var tag = reader.GetString(7);
+									var end_x = reader.GetInt32(3);
+									var end_y = reader.GetInt32(4);
+									var end_z = reader.GetInt32(5);
 
-										writer.WriteObject(() => {
-											writer.WriteObject("geometry",
-															() => {
-																writer.WriteArray("coordinates",
-																				() => {
-																					writer.WriteArray(start_x, start_z)
-																							.WriteArray(end_x, end_z);
-																				})
-																		.WriteKeyValue("type", "LineString");
-															})
-													.WriteObject("properties",
-															() => {
-																writer.WriteKeyValue("depth1", start_y)
-																		.WriteKeyValue("depth2", end_y)
-																		.WriteKeyValue("label", label)
-																		.WriteKeyValue("tag", tag);
-															})
-													.WriteKeyValue("type", "Feature");
-										});
-									}))
-							.WriteKeyValue("name", "translocators")
-							.WriteKeyValue("type", "FeatureCollection");
-				});
-			}
+									var label = reader.GetString(6);
+									var tag = reader.GetString(7);
+
+									writer.WriteObject(() => {
+										writer.WriteObject("geometry",
+														() => {
+															writer.WriteArray("coordinates",
+																			() => {
+																				writer.WriteArray(start_x, start_z)
+																						.WriteArray(end_x, end_z);
+																			})
+																	.WriteKeyValue("type", "LineString");
+														})
+												.WriteObject("properties",
+														() => {
+															writer.WriteKeyValue("depth1", start_y)
+																	.WriteKeyValue("depth2", end_y)
+																	.WriteKeyValue("label", label)
+																	.WriteKeyValue("tag", tag);
+														})
+												.WriteKeyValue("type", "Feature");
+									});
+								}))
+						.WriteKeyValue("name", "translocators")
+						.WriteKeyValue("type", "FeatureCollection");
+			});
+			return null;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to export teleporter GeoJSON.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 }

@@ -12,7 +12,7 @@ using Vintagestory.API.Server;
 
 namespace ServaMap.Server;
 
-public class ShardHandlerModSystem : DatabaseHandlerModSystem {
+public class ShardHandlerModSystem : DatabaseHandlerModSystem<ChunkShard> {
 	private int chunkSize;
 	private ImageInfo imageInfo;
 	private string shardTilePath;
@@ -25,16 +25,27 @@ public class ShardHandlerModSystem : DatabaseHandlerModSystem {
 
 		chunkSize = serverAPI.World.BlockAccessor.ChunkSize;
 		imageInfo = new ImageInfo(chunkSize, chunkSize, 8, false);
+
 		serverAPI.Network.GetChannel(ServaMapServerMod.NetworkChannelName)
 				.RegisterMessageType<List<ChunkShard>>()
 				.SetMessageHandler((IServerPlayer serverPlayer, List<ChunkShard> shards) => {
 					logger.Notification($"{serverPlayer.PlayerName} sent: {shards.Count} chunks");
 					foreach (var chunkShard in shards) {
 						chunkShard.GeneratingPlayerId = serverPlayer.PlayerUID;
-						ProcessShard(chunkShard);
+						ProcessFeature(chunkShard);
 					}
 				});
 
+		serverAPI.ChatCommands.GetOrCreate("servamapadmin")
+				.WithSub("exportwholemap",
+						command => command.WithDesc("Export the whole server map as one .PNG")
+								.RequiresPrivilege(Privilege.controlserver)
+								.HandleWith(ExportWholeMapHandler));
+
+		InitializeShardDatabase();
+	}
+
+	private void InitializeShardDatabase() {
 		try {
 			InitializeDatabase();
 			using (var command = conn.CreateCommand()) {
@@ -57,47 +68,35 @@ CREATE TABLE IF NOT EXISTS {TableName}
 			logger.Error("Serv-a-Map failed to open the tile path or database:");
 			logger.Error(e.ToString());
 		}
-
-		serverAPI.ChatCommands.GetOrCreate("servamapadmin")
-				.WithSub("exportwholemap",
-						command => command.WithDesc("Export the whole server map as one .PNG")
-								.RequiresPrivilege(Privilege.controlserver)
-								.HandleWith(ExportWholeMapHandler));
 	}
 
-	/// <summary>
-	///   Checks against the shard database to see if the shard is actually different.
-	///   If it is different, then make the change in the DB and the chunk tile.
-	/// </summary>
-	/// <param name="shard"></param>
-	/// <returns>true if the shard was processed without error; otherwise, false.</returns>
-	public bool ProcessShard(ChunkShard shard) {
-		if (shard.IsInvalid)
-			return false;
+	public override Result<bool> ProcessFeature(ChunkShard shard) {
+		if (shard.ShardImage is null)
+			return new ArgumentException("Given chunk shard image is null.");
+		if (shard.ChunkCoords is null)
+			return new ArgumentException("Given chunk shard coordinates are null.");
 		if (shard.ShardImage.Length != chunkSize * chunkSize)
+			return new ArgumentException(
+					$"Given chunk shard is an invalid size. Expected {chunkSize * chunkSize}, got {shard.ShardImage.Length}.");
+		var shouldUpdate = ShouldUpdate(shard);
+		if (shouldUpdate.IsException)
+			return shouldUpdate;
+		if (!shouldUpdate.Good)
 			return false;
-		try {
-			logger.Notification($"Processing shard: {shard.ChunkCoords} {shard.GenerationTime}");
-			if (!ShouldUpdateShard(shard))
-				return true;
-			UpdateShard(shard);
-			WriteImage(shard);
-		}
-		catch (Exception e) {
-			logger.Error($"Serv-a-Map failed to update a shard: {shard.ChunkCoords}");
-			logger.Error(e.ToString());
-			return false;
-		}
-		return true;
+		var writeRes = WriteImage(shard);
+		if (writeRes is not null)
+			return writeRes;
+		return Update(shard);
 	}
 
-	private void WriteImage(ChunkShard shard) {
-		var coords = shard.ChunkCoords;
-		var shardImage = shard.SquareShardImage;
+	private Exception WriteImage(ChunkShard shard) {
+		try {
+			var coords = shard.ChunkCoords;
+			var shardImage = shard.SquareShardImage;
 
-		var path = Path.Combine(shardTilePath, $"{coords.X}_{coords.Y}.png");
+			var path = Path.Combine(shardTilePath, $"{coords.X}_{coords.Y}.png");
 
-		using (var stream = FileHelper.OpenFileForWriting(path, true)) {
+			using var stream = FileHelper.OpenFileForWriting(path, true);
 			var pngWriter = new PngWriter(stream, imageInfo);
 			var imgLine = new ImageLine(imageInfo);
 			for (var row = 0; row < chunkSize; row++) {
@@ -108,11 +107,18 @@ CREATE TABLE IF NOT EXISTS {TableName}
 			pngWriter.CompLevel = 5;
 			pngWriter.CompressionStrategy = EDeflateCompressStrategy.Default;
 			pngWriter.End();
+			return null;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to write a chunk shard image.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
-	private bool ShouldUpdateShard(ChunkShard shard) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> ShouldUpdate(ChunkShard shard) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 SELECT * FROM {TableName}
 WHERE x = $x
@@ -129,10 +135,16 @@ WHERE x = $x
 			// This is a totally new shard.
 			return !reader.HasRows;
 		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to test if a chunk shard should update.");
+			logger.Error(e.ToString());
+			return e;
+		}
 	}
 
-	private void UpdateShard(ChunkShard shard) {
-		using (var command = conn.CreateCommand()) {
+	public override Result<bool> Update(ChunkShard shard) {
+		try {
+			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 INSERT OR REPLACE INTO {TableName}
 VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
@@ -143,18 +155,54 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 			command.Parameters.AddWithValue("$generation_time", shard.GenerationTime);
 			command.Parameters.AddWithValue("$image_hash", shard.ShardImage.GetHashCode());
 			command.Parameters.AddWithValue("$generating_player_id", shard.GeneratingPlayerId);
-			command.ExecuteNonQuery();
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to test if a chunk shard should update.");
+			logger.Error(e.ToString());
+			return e;
 		}
 	}
 
-	public override void Clear() {
-		base.Clear();
-		var allFiles = Directory.GetFiles(shardTilePath);
-		foreach (var file in allFiles)
-			File.Delete(file);
+	public override Result<bool> Delete(ChunkShard shard) {
+		try {
+			using var command = conn.CreateCommand();
+			command.CommandText = @$"
+DELETE FROM {TableName}
+WHERE x = $x
+  AND y = $y
+";
+			command.Parameters.AddWithValue("$x", shard.ChunkCoords.X);
+			command.Parameters.AddWithValue("$y", shard.ChunkCoords.Y);
+			var rowsAffected = command.ExecuteNonQuery();
+			return rowsAffected > 0;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to delete a chunk shard.");
+			logger.Error(e.ToString());
+			return e;
+		}
 	}
 
-	public bool ExportWholeMap() {
+	public override Exception Clear() {
+		var res = base.Clear();
+		if (res is not null)
+			return res;
+		try {
+			var allFiles = Directory.GetFiles(shardTilePath);
+			foreach (var file in allFiles)
+				File.Delete(file);
+			return null;
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to clear the chunk tile path.");
+			logger.Error(e.ToString());
+			return e;
+		}
+	}
+
+	public Exception ExportWholeMap() {
 		string[] pngs;
 		try {
 			pngs = Directory.GetFiles(config.GetShardTileFullPath(serverAPI));
@@ -162,7 +210,7 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 		catch (Exception e) {
 			logger.Error("Serv-a-Map failed to enumerate chunk shards while exporting the whole map.");
 			logger.Error(e);
-			return false;
+			return e;
 		}
 
 		int maxX = int.MinValue, maxY = int.MinValue, minX = int.MaxValue, minY = int.MaxValue;
@@ -178,17 +226,16 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 			minX = Helpers.Min(x, minX);
 			minY = Helpers.Min(y, minY);
 			try {
-				using (var readerStream = FileHelper.OpenFileForReading(png)) {
-					var reader = new PngReader(readerStream);
-					var rows = reader.ReadRowsInt();
-					var lines = rows.Scanlines;
-					texs.Add((new Vec2i(x, y), lines));
-				}
+				using var readerStream = FileHelper.OpenFileForReading(png);
+				var reader = new PngReader(readerStream);
+				var rows = reader.ReadRowsInt();
+				var lines = rows.Scanlines;
+				texs.Add((new Vec2i(x, y), lines));
 			}
 			catch (Exception e) {
 				logger.Error("Serv-a-Map failed to load a chunk shards while exporting the whole map.");
 				logger.Error(e);
-				return false;
+				return e;
 			}
 		}
 
@@ -234,16 +281,16 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 			logger.Error(
 					"Serv-a-Map failed to create the final image file while exporting the whole map.");
 			logger.Error(e);
-			return false;
+			return e;
 		}
 
 		logger.Notification("Done writing");
 
-		return true;
+		return null;
 	}
 
 	private TextCommandResult ExportWholeMapHandler(TextCommandCallingArgs args) =>
-			ExportWholeMap()
+			ExportWholeMap() is null
 					? TextCommandResult.Success("Serv-a-Map exported the whole map.")
 					: TextCommandResult.Error(
 							"Serv-a-Map failed to export the map! Check server-main.txt for more information.");
