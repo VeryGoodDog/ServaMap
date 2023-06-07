@@ -27,7 +27,7 @@ public class ServaMapCommandSystem : ModSystem {
 		logger = serverAPI.Logger;
 		coreMod = serverAPI.ModLoader.GetModSystem<ServaMapServerMod>();
 
-		serverAPI.ChatCommands.Create("servermapadmin")
+		serverAPI.ChatCommands.GetOrCreate("servamapadmin")
 				.RequiresPrivilege(Privilege.controlserver)
 				.WithDesc("Administrator controls for Serv-a-Map")
 				.WithAlias("smadmin")

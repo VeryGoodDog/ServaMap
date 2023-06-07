@@ -12,7 +12,7 @@ using Vintagestory.API.Server;
 
 namespace ServaMap.Server;
 
-public class LandmarkHandlerModSystem : DatabaseHandlerModSystem<Landmark> {
+public class LandmarkHandlerModSystem : FeatureDatabaseHandlerModSystem<Landmark> {
 	public override string TableName => "landmarks";
 
 	public override void StartServerSide(ICoreServerAPI api) {
@@ -56,8 +56,8 @@ public class LandmarkHandlerModSystem : DatabaseHandlerModSystem<Landmark> {
 	private void InitializeLandmarkDatabase() {
 		try {
 			InitializeDatabase();
-			using (var command = conn.CreateCommand()) {
-				command.CommandText = @$"
+			using var command = conn.CreateCommand();
+			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
     x UNIQUE,
@@ -68,8 +68,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
     creator_id UNIQUE
 )
 ";
-				command.ExecuteNonQuery();
-			}
+			command.ExecuteNonQuery();
 		}
 		catch (Exception e) {
 			logger.Error("Serv-a-Map failed to open the landmark database:");
@@ -209,51 +208,27 @@ WHERE creator_id = $creator_id
 		}
 	}
 
-	public Exception WriteGeoJson() {
-		try {
-			using var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8);
-			using var writer = new JsonTextWriter(stream);
-			writer.Formatting = Formatting.None;
-			writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
-			writer.WriteObject(() => {
-				writer.WriteObject("crs",
-								() => {
-									writer.WriteObject("properties",
-													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
-											.WriteKeyValue("type", "name");
-								})
-						.WriteArray("features",
-								() => WriteFeatures(reader => {
-									var x = reader.GetInt32(0);
-									var y = reader.GetInt32(1);
-									var z = reader.GetInt32(2);
-									var label = reader.GetString(3);
-									var type = reader.GetString(4);
-									writer.WriteObject(() => {
-										writer.WriteObject("geometry",
-														() => {
-															writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
-														})
-												.WriteObject("properties",
-														() => {
-															writer.WriteKeyValue("label", label)
-																	.WriteKeyValue("type", type)
-																	.WriteKeyValue("z", y);
-														})
-												.WriteKeyValue("type", "Feature");
-									});
-								}))
-						.WriteKeyValue("name", "traders")
-						.WriteKeyValue("type", "FeatureCollection");
+	public Exception WriteGeoJson() =>
+			WriteFeatures((writer, reader) => {
+				var x = reader.GetInt32(0);
+				var y = reader.GetInt32(1);
+				var z = reader.GetInt32(2);
+				var label = reader.GetString(3);
+				var type = reader.GetString(4);
+				writer.WriteObject(() => {
+					writer.WriteObject("geometry",
+									() => {
+										writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
+									})
+							.WriteObject("properties",
+									() => {
+										writer.WriteKeyValue("label", label)
+												.WriteKeyValue("type", type)
+												.WriteKeyValue("z", y);
+									})
+							.WriteKeyValue("type", "Feature");
+				});
 			});
-			return null;
-		}
-		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to export landmark GeoJSON.");
-			logger.Error(e.ToString());
-			return e;
-		}
-	}
 
 	private TextCommandResult LandmarkAddHandler(TextCommandCallingArgs args) {
 		var pos = args.Caller.Pos.AsBlockPos.ToLocalPosition(serverAPI);

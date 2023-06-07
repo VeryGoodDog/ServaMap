@@ -10,7 +10,7 @@ using Vintagestory.GameContent;
 
 namespace ServaMap.Server;
 
-public class TraderHandlerModSystem : DatabaseHandlerModSystem<Trader> {
+public class TraderHandlerModSystem : FeatureDatabaseHandlerModSystem<Trader> {
 	public override string TableName => "traders";
 
 	public override void StartServerSide(ICoreServerAPI api) {
@@ -30,8 +30,8 @@ public class TraderHandlerModSystem : DatabaseHandlerModSystem<Trader> {
 	private void InitializeTraderDatabase() {
 		try {
 			InitializeDatabase();
-			using (var command = conn.CreateCommand()) {
-				command.CommandText = @$"
+			using var command = conn.CreateCommand();
+			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
     id UNIQUE,
@@ -44,8 +44,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
     wares NOT NULL
 )
 ";
-				command.ExecuteNonQuery();
-			}
+			command.ExecuteNonQuery();
 		}
 		catch (Exception e) {
 			logger.Error("Serv-a-Map failed to open the trader database:");
@@ -135,49 +134,25 @@ WHERE id = $id
 		}
 	}
 
-	public Exception WriteGeoJson() {
-		try {
-			using var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8);
-			using var writer = new JsonTextWriter(stream);
-			writer.Formatting = Formatting.None;
-			writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
-			writer.WriteObject(() => {
-				writer.WriteObject("crs",
-								() => {
-									writer.WriteObject("properties",
-													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
-											.WriteKeyValue("type", "name");
-								})
-						.WriteArray("features",
-								() => WriteFeatures(reader => {
-									var x = reader.GetDouble(1);
-									var y = reader.GetDouble(2);
-									var z = reader.GetDouble(3);
-									var name = reader.GetString(4);
-									var wares = reader.GetString(5);
-									writer.WriteObject(() => {
-										writer.WriteObject("geometry",
-														() => {
-															writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
-														})
-												.WriteObject("properties",
-														() => {
-															writer.WriteKeyValue("name", name)
-																	.WriteKeyValue("wares", wares)
-																	.WriteKeyValue("z", y);
-														})
-												.WriteKeyValue("type", "Feature");
-									});
-								}))
-						.WriteKeyValue("name", "traders")
-						.WriteKeyValue("type", "FeatureCollection");
+	public Exception WriteGeoJson() =>
+			WriteFeatures((writer, reader) => {
+				var x = reader.GetDouble(1);
+				var y = reader.GetDouble(2);
+				var z = reader.GetDouble(3);
+				var name = reader.GetString(4);
+				var wares = reader.GetString(5);
+				writer.WriteObject(() => {
+					writer.WriteObject("geometry",
+									() => {
+										writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
+									})
+							.WriteObject("properties",
+									() => {
+										writer.WriteKeyValue("name", name)
+												.WriteKeyValue("wares", wares)
+												.WriteKeyValue("z", y);
+									})
+							.WriteKeyValue("type", "Feature");
+				});
 			});
-			return null;
-		}
-		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to export trader GeoJSON.");
-			logger.Error(e.ToString());
-			return e;
-		}
-	}
 }

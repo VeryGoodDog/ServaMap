@@ -74,7 +74,7 @@ public class ChunkRenderer {
 
 			chunkShard[index] = ColorUtil.ColorMultiply3Clamped(col, boostMultiplier);
 		}
-		return new ChunkShard(chunkPos, chunkShard, DateTime.UtcNow);
+		return new ChunkShard(chunkPos, chunkShard);
 	}
 
 	private IWorldChunk[] GetTempChunkColumn(Vec2i chunkPos) {

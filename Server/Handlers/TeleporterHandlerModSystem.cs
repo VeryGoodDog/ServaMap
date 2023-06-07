@@ -13,7 +13,7 @@ using Vintagestory.GameContent;
 namespace ServaMap.Server;
 
 // Handles teleporters and translocators
-public class TeleporterHandlerModSystem : DatabaseHandlerModSystem<Teleporter> {
+public class TeleporterHandlerModSystem : FeatureDatabaseHandlerModSystem<Teleporter> {
 	public override string TableName => "teleporters";
 
 	public override void StartServerSide(ICoreServerAPI api) {
@@ -41,7 +41,7 @@ public class TeleporterHandlerModSystem : DatabaseHandlerModSystem<Teleporter> {
 		if (blockEntity is null)
 			return;
 
-		var res = Delete(new Teleporter {
+		Delete(new Teleporter {
 			Start = blockSelection.Position
 		});
 	}
@@ -49,8 +49,8 @@ public class TeleporterHandlerModSystem : DatabaseHandlerModSystem<Teleporter> {
 	private void InitializeTeleporterDatabase() {
 		try {
 			InitializeDatabase();
-			using (var command = conn.CreateCommand()) {
-				command.CommandText = @$"
+			using var command = conn.CreateCommand();
+			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
     start_x UNIQUE,
@@ -65,8 +65,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
     tag NOT NULL
 )
 ";
-				command.ExecuteNonQuery();
-			}
+			command.ExecuteNonQuery();
 		}
 		catch (Exception e) {
 			logger.Error("Serv-a-Map failed to open the teleporter database:");
@@ -176,61 +175,36 @@ WHERE (start_x = $start_x AND start_y = $start_y AND start_z = $start_z)
 		}
 	}
 
-	public Exception WriteGeoJson() {
-		try {
-			using var stream = new StreamWriter(jsonFilePath, false, Encoding.UTF8);
-			using var writer = new JsonTextWriter(stream);
-			writer.Formatting = Formatting.None;
-			writer.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
-			writer.WriteObject(() => {
-				writer.WriteObject("crs",
-								() => {
-									writer.WriteObject("properties",
-													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
-											.WriteKeyValue("type", "name");
-								})
-						.WriteArray("features",
-								() => WriteFeatures(reader => {
-									var start_x = reader.GetInt32(0);
-									var start_y = reader.GetInt32(1);
-									var start_z = reader.GetInt32(2);
+	public Exception WriteGeoJson() =>
+			WriteFeatures((writer, reader) => {
+				var start_x = reader.GetInt32(0);
+				var start_y = reader.GetInt32(1);
+				var start_z = reader.GetInt32(2);
 
-									var end_x = reader.GetInt32(3);
-									var end_y = reader.GetInt32(4);
-									var end_z = reader.GetInt32(5);
+				var end_x = reader.GetInt32(3);
+				var end_y = reader.GetInt32(4);
+				var end_z = reader.GetInt32(5);
 
-									var label = reader.GetString(6);
-									var tag = reader.GetString(7);
+				var label = reader.GetString(6);
+				var tag = reader.GetString(7);
 
-									writer.WriteObject(() => {
-										writer.WriteObject("geometry",
+				writer.WriteObject(() => {
+					writer.WriteObject("geometry",
+									() => {
+										writer.WriteArray("coordinates",
 														() => {
-															writer.WriteArray("coordinates",
-																			() => {
-																				writer.WriteArray(start_x, start_z)
-																						.WriteArray(end_x, end_z);
-																			})
-																	.WriteKeyValue("type", "LineString");
+															writer.WriteArray(start_x, start_z).WriteArray(end_x, end_z);
 														})
-												.WriteObject("properties",
-														() => {
-															writer.WriteKeyValue("depth1", start_y)
-																	.WriteKeyValue("depth2", end_y)
-																	.WriteKeyValue("label", label)
-																	.WriteKeyValue("tag", tag);
-														})
-												.WriteKeyValue("type", "Feature");
-									});
-								}))
-						.WriteKeyValue("name", "translocators")
-						.WriteKeyValue("type", "FeatureCollection");
+												.WriteKeyValue("type", "LineString");
+									})
+							.WriteObject("properties",
+									() => {
+										writer.WriteKeyValue("depth1", start_y)
+												.WriteKeyValue("depth2", end_y)
+												.WriteKeyValue("label", label)
+												.WriteKeyValue("tag", tag);
+									})
+							.WriteKeyValue("type", "Feature");
+				});
 			});
-			return null;
-		}
-		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to export teleporter GeoJSON.");
-			logger.Error(e.ToString());
-			return e;
-		}
-	}
 }

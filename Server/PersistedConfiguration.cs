@@ -20,7 +20,7 @@ public class PersistedConfiguration {
 
 	public string ServerMapPath { get; set; } = "ServerMapData";
 
-	public string ShardTilePath { get; set; } = "shardTiles";
+	public string ShardTextureDataPath { get; set; } = "shardTextureData";
 
 	public int GeoJsonAutoExportIntervalSeconds { get; set; } = 10;
 
@@ -68,9 +68,6 @@ public class PersistedConfiguration {
 		return serverMapFullPath;
 	}
 
-	public string GetDBFullPath(ICoreServerAPI api) =>
-			Path.Combine(GetServerMapFullPath(api), DBFileName);
-
-	public string GetShardTileFullPath(ICoreServerAPI api) =>
-			Path.Combine(GetServerMapFullPath(api), ShardTilePath);
+	public string GetSubPath(ICoreServerAPI api, string subPath) =>
+			Path.Combine(GetServerMapFullPath(api), subPath);
 }

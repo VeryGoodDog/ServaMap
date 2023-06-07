@@ -34,7 +34,7 @@
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\System.Data.SQLite.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="System.Drawing.Primitives"/>
+        <Reference Include="System.Drawing.Primitives" />
         <Reference Include="VintagestoryAPI">
             <HintPath>\home\ah\ApplicationData\vintagestory\VintagestoryAPI.dll</HintPath>
             <Private>False</Private>
@@ -55,8 +55,8 @@
             <HintPath>\home\ah\ApplicationData\vintagestory\Mods\VSSurvivalMod.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="System.Drawing"/>
-        <Reference Include="System.Web"/>
+        <Reference Include="System.Drawing" />
+        <Reference Include="System.Web" />
         <Reference Include="protobuf-net">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\protobuf-net.dll</HintPath>
             <Private>False</Private>
@@ -64,7 +64,7 @@
         <Reference Include="Pngcs">
             <HintPath>..\..\Pngcs.dll</HintPath>
         </Reference>
-        <Reference Include="System.Xml"/>
+        <Reference Include="System.Xml" />
         <Reference Include="Newtonsoft.Json">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
             <Private>False</Private>
@@ -76,8 +76,8 @@
     </ItemGroup>
 
     <Target Name="CustomAfterBuild" AfterTargets="Build">
-        <MakeDir Directories="$(VintageStoryInstall)\Mods\$(AssemblyName)"/>
-        <Exec Command="cp -r $(OutputPath)* $(VintageStoryInstall)/Mods/$(AssemblyName)"/>
+        <MakeDir Directories="$(VintageStoryInstall)\Mods\$(AssemblyName)" />
+        <Exec Command="cp -r $(OutputPath)* $(VintageStoryInstall)/Mods/$(AssemblyName)" />
     </Target>
     <ItemGroup>
         <None Include="modinfo.json">

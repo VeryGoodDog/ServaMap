@@ -14,4 +14,9 @@ To generate metadata, the server scans for P/EOIs each time a chunk is
 generated.
 These are also added to DBs. Additionally, it tracks when P/EOIs are removed.
 
+Note on nomenclature:
 
+A "shard" is an instance of `ChunkShard` or its texture.
+It is the smallest unit of the map and corresponds to a single chunk.
+A "tile" is an actual image that is part of the map.
+It can be made of any number of chunks.
