@@ -61,7 +61,6 @@ public class ServaMapServerMod : ModSystem {
 			config = new PersistedConfiguration();
 			serverAPI.StoreModConfig(config, _configFilename);
 		}
-		config.Fix();
 
 		logger.Notification($"Loaded config from {_configFilename}");
 		CachedConfiguration = config;

@@ -10,7 +10,7 @@ using Vintagestory.API.Server;
 namespace ServaMap.Server;
 
 public class PersistedConfiguration {
-	private string DBFileName;
+	public string DBFileName { get; set; } = "serverMapDB";
 
 	[JsonIgnore]
 	private Dictionary<int, int> designatorsAsInts = null;
@@ -18,37 +18,24 @@ public class PersistedConfiguration {
 	[JsonIgnore]
 	private string serverMapFullPath = null;
 
-	private string ServerMapPath;
+	public string ServerMapPath { get; set; } = "ServerMapData";
 
-	private string ShardTilePath;
+	public string ShardTilePath { get; set; } = "shardTiles";
 
-	public int GeoJsonAutoExportIntervalSeconds { get; set; }
+	public int GeoJsonAutoExportIntervalSeconds { get; set; } = 10;
 
 	//All - Designators, setup
-	public Dictionary<AssetLocation, Color> BlockReplacementDesignators { get; set; }
-
-	public static Dictionary<AssetLocation, Color> DefaultBlockDesignators =>
-			new() {
-				{
-					new AssetLocation("game", "stonepath*"), Color.Yellow
-				}, {
-					new AssetLocation("game", "sign*"), Color.Teal
-				}, {
-					new AssetLocation("game", "statictranslocator-normal*"), Color.SteelBlue
-				}, {
-					new AssetLocation("game", "teleporterbase"), Color.SeaGreen
-				}
-			};
-
-	/// <summary>
-	///   Sets the attributes to default values if they are missing.
-	/// </summary>
-	public void Fix() {
-		BlockReplacementDesignators ??= DefaultBlockDesignators;
-		DBFileName ??= "serverMapDB";
-		ShardTilePath ??= "shardTiles";
-		ServerMapPath ??= "ServerMapData";
-	}
+	public Dictionary<AssetLocation, Color> BlockReplacementDesignators { get; set; } = new() {
+		{
+			new AssetLocation("game", "stonepath*"), Color.Yellow
+		}, {
+			new AssetLocation("game", "sign*"), Color.Teal
+		}, {
+			new AssetLocation("game", "statictranslocator-normal*"), Color.SteelBlue
+		}, {
+			new AssetLocation("game", "teleporterbase"), Color.SeaGreen
+		}
+	};
 
 	public Dictionary<int, int> GetDesignatorsAsInts(ICoreServerAPI api) {
 		if (designatorsAsInts is null) {
