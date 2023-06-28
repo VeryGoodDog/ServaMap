@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-
-using Hjg.Pngcs;
-using Hjg.Pngcs.Zlib;
+using System.Runtime.InteropServices;
 
 using ProtoBuf;
+
+using SkiaSharp;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.CommandAbbr;
@@ -16,7 +16,6 @@ namespace ServaMap.Server;
 
 public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard> {
 	private int chunkSize => serverAPI.World.BlockAccessor.ChunkSize;
-	private ImageInfo imageInfo => new ImageInfo(chunkSize, chunkSize, 8, false);
 	private string shardTexturePath => config.GetSubPath(serverAPI, config.ShardTextureDataPath);
 
 	public override string TableName => "chunks";
@@ -234,38 +233,40 @@ WHERE x = $x
 
 		var origin = new Vec2i(minX, minY);
 
-		var fullTex = new int[height, width];
+		var fullTex = new int[height * width];
 
 		foreach (var (coord, tex) in texs) {
 			coord.Add(-origin.X, -origin.Y);
 
 			for (var y = 0; y < chunkSize; y++) {
-				var actualY = coord.Y * chunkSize + y;
+				var actualY = (coord.Y * chunkSize + y) * width;
 				var row = y * chunkSize;
 
 				for (var x = 0; x < chunkSize; x++) {
 					var actualX = coord.X * chunkSize + x;
 					var index = row + x;
-					fullTex[actualY, actualX] = tex[index];
+					fullTex[actualY + actualX] = tex[index];
 				}
 			}
 		}
 
 		logger.Notification("starting write");
 
-		var imgInfo = new ImageInfo(width, height, 8, false);
 		var fullMapPath = Path.Combine(config.GetServerMapFullPath(serverAPI), "fullmap.png");
 
 		try {
-			var stream = FileHelper.OpenFileForWriting(fullMapPath, true);
-			var writer = new PngWriter(stream, imgInfo);
-			var imgLine = new ImageLine(imgInfo);
-			for (var row = 0; row < height; row++) {
-				for (var col = 0; col < width; col++)
-					ImageLineHelper.SetPixelFromARGB8(imgLine, col, fullTex[row, col]);
-				writer.WriteRow(imgLine.Scanline);
+			using var bitMap = new SKBitmap(width, height, true);
+			var handle = GCHandle.Alloc(fullTex, GCHandleType.Pinned);
+			try {
+				var pointer = handle.AddrOfPinnedObject();
+				bitMap.SetPixels(pointer);
 			}
-			writer.End();
+			finally {
+				if (handle.IsAllocated)
+					handle.Free();
+			}
+			using var file = File.OpenWrite(fullMapPath);
+			bitMap.Encode(SKEncodedImageFormat.Png, 100).SaveTo(file);
 		}
 		catch (Exception e) {
 			logger.Error(

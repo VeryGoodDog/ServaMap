@@ -61,9 +61,6 @@
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\protobuf-net.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="Pngcs">
-            <HintPath>..\..\Pngcs.dll</HintPath>
-        </Reference>
         <Reference Include="System.Xml" />
         <Reference Include="Newtonsoft.Json">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
@@ -83,6 +80,10 @@
         <None Include="modinfo.json">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="SkiaSharp" Version="2.88.3" />
+      <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.3" />
     </ItemGroup>
     <!--  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />-->
 </Project>
