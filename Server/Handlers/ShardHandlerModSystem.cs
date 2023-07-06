@@ -235,6 +235,50 @@ WHERE x = $x
 
 		var fullTex = new int[height * width];
 
+		InsertIntoFullTexture(texs, origin, width, fullTex);
+
+		logger.Notification("starting write");
+
+		var fullMapPath = Path.Combine(config.GetServerMapFullPath(serverAPI), "fullmap.png");
+
+		var exception = WriteBitmapToFile(width, height, fullTex, fullMapPath);
+		
+		if (exception is not null)
+			return exception;
+
+		logger.Notification("Done writing");
+
+		return null;
+	}
+
+	private Exception WriteBitmapToFile(int width, int height, int[] fullTex, string fullMapPath) {
+		try {
+			using var bitMap = new SKBitmap(width, height, true);
+			CopyToBitmap(fullTex, bitMap);
+			using var file = File.OpenWrite(fullMapPath);
+			bitMap.Encode(SKEncodedImageFormat.Png, 100).SaveTo(file);
+		}
+		catch (Exception e) {
+			logger.Error("Serv-a-Map failed to create the final image file while exporting the whole map.");
+			logger.Error(e);
+			return e;
+		}
+		return null;
+	}
+
+	private static void CopyToBitmap(int[] fullTex, SKBitmap bitMap) {
+		var handle = GCHandle.Alloc(fullTex, GCHandleType.Pinned);
+		try {
+			var pointer = handle.AddrOfPinnedObject();
+			bitMap.SetPixels(pointer);
+		}
+		finally {
+			if (handle.IsAllocated)
+				handle.Free();
+		}
+	}
+
+	private void InsertIntoFullTexture(List<(Vec2i, int[])> texs, Vec2i origin, int width, int[] fullTex) {
 		foreach (var (coord, tex) in texs) {
 			coord.Add(-origin.X, -origin.Y);
 
@@ -249,40 +293,10 @@ WHERE x = $x
 				}
 			}
 		}
-
-		logger.Notification("starting write");
-
-		var fullMapPath = Path.Combine(config.GetServerMapFullPath(serverAPI), "fullmap.png");
-
-		try {
-			using var bitMap = new SKBitmap(width, height, true);
-			var handle = GCHandle.Alloc(fullTex, GCHandleType.Pinned);
-			try {
-				var pointer = handle.AddrOfPinnedObject();
-				bitMap.SetPixels(pointer);
-			}
-			finally {
-				if (handle.IsAllocated)
-					handle.Free();
-			}
-			using var file = File.OpenWrite(fullMapPath);
-			bitMap.Encode(SKEncodedImageFormat.Png, 100).SaveTo(file);
-		}
-		catch (Exception e) {
-			logger.Error(
-					"Serv-a-Map failed to create the final image file while exporting the whole map.");
-			logger.Error(e);
-			return e;
-		}
-
-		logger.Notification("Done writing");
-
-		return null;
 	}
 
 	private TextCommandResult ExportWholeMapHandler(TextCommandCallingArgs args) =>
 			ExportWholeMap() is null
 					? TextCommandResult.Success("Serv-a-Map exported the whole map.")
-					: TextCommandResult.Error(
-							"Serv-a-Map failed to export the map! Check server-main.txt for more information.");
+					: TextCommandResult.Error("Serv-a-Map failed to export the map! Check server-main.txt for more information.");
 }
