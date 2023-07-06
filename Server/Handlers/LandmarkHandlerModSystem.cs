@@ -49,13 +49,10 @@ public class LandmarkHandlerModSystem : FeatureDatabaseHandlerModSystem<Landmark
 
 		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
-
-		InitializeLandmarkDatabase();
 	}
 
-	private void InitializeLandmarkDatabase() {
+	public override void InitializeDatabase() {
 		try {
-			InitializeDatabase();
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}

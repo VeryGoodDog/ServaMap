@@ -39,13 +39,10 @@ public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard>
 						command => command.WithDesc("Export the whole server map as one .PNG")
 								.RequiresPrivilege(Privilege.controlserver)
 								.HandleWith(ExportWholeMapHandler));
-
-		InitializeShardDatabase();
 	}
 
-	private void InitializeShardDatabase() {
+	public override void InitializeDatabase() {
 		try {
-			InitializeDatabase();
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}

@@ -31,12 +31,15 @@ public abstract class DatabaseHandlerModSystem<T> : ModSystem {
 
 		config = ServaMapServerMod.GetConfig(api);
 		dBFullPath = config.GetSubPath(serverAPI, config.DBFileName);
+		
+		InitializeCoreDatabase();
+		InitializeDatabase();
 	}
 
 	/// <summary>
 	///   Opens the database, or creates it if needed.
 	/// </summary>
-	public void InitializeDatabase() {
+	private void InitializeCoreDatabase() {
 		if (!File.Exists(dBFullPath))
 			SQLiteConnection.CreateFile(dBFullPath);
 		var connBuilder = new SQLiteConnectionStringBuilder();
@@ -44,6 +47,8 @@ public abstract class DatabaseHandlerModSystem<T> : ModSystem {
 		conn = new SQLiteConnection(connBuilder.ToString());
 		conn.Open();
 	}
+
+	public abstract void InitializeDatabase();
 
 	public abstract Result<bool> Update(T toUpdate);
 

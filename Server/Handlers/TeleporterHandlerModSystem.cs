@@ -28,8 +28,6 @@ public class TeleporterHandlerModSystem : FeatureDatabaseHandlerModSystem<Telepo
 
 		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
-
-		InitializeTeleporterDatabase();
 	}
 
 	private void OnEventOnBreakBlock(IServerPlayer serverPlayer, BlockSelection blockSelection,
@@ -46,9 +44,8 @@ public class TeleporterHandlerModSystem : FeatureDatabaseHandlerModSystem<Telepo
 		});
 	}
 
-	private void InitializeTeleporterDatabase() {
+	public override void InitializeDatabase() {
 		try {
-			InitializeDatabase();
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}

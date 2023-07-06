@@ -23,13 +23,10 @@ public class TraderHandlerModSystem : FeatureDatabaseHandlerModSystem<Trader> {
 
 		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
-
-		InitializeTraderDatabase();
 	}
 
-	private void InitializeTraderDatabase() {
+	public override void InitializeDatabase() {
 		try {
-			InitializeDatabase();
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
