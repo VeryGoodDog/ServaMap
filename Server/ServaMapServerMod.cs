@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System.Data.SQLite;
+using System.IO;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -22,6 +24,8 @@ public class ServaMapServerMod : ModSystem {
 		set => serverAPI.ObjectCache.Add(_configFilename, value);
 	}
 
+	internal SQLiteConnection dbConnection;
+
 	public override bool ShouldLoad(EnumAppSide forSide) => forSide.IsServer();
 
 	public override double ExecuteOrder() => 0.2;
@@ -42,6 +46,16 @@ public class ServaMapServerMod : ModSystem {
 				.RegisterMessageType<Dictionary<int, int>>();
 
 		serverAPI.Event.GameWorldSave += () => PersistParameterChange();
+
+		var dBFullFilePath = Path.Combine(CachedConfiguration.GetOrCreateServerMapFullDirectory(api),
+				CachedConfiguration.DBFileName);
+
+		if (!File.Exists(dBFullFilePath))
+			SQLiteConnection.CreateFile(dBFullFilePath);
+		var connBuilder = new SQLiteConnectionStringBuilder();
+		connBuilder.DataSource = dBFullFilePath;
+		dbConnection = new SQLiteConnection(connBuilder.ToString());
+		dbConnection.Open();
 	}
 
 	public static PersistedConfiguration GetConfig(ICoreServerAPI api) =>
@@ -66,6 +80,5 @@ public class ServaMapServerMod : ModSystem {
 		CachedConfiguration = config;
 	}
 
-	internal void PersistParameterChange() =>
-			serverAPI.StoreModConfig(CachedConfiguration, _configFilename);
+	internal void PersistParameterChange() => serverAPI.StoreModConfig(CachedConfiguration, _configFilename);
 }

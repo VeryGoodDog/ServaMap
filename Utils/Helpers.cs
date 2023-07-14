@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Runtime.InteropServices;
+
+using SkiaSharp;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.CommandAbbr;
@@ -32,5 +35,17 @@ public static class Helpers {
 		var c = command.BeginSub(name);
 		sub(c);
 		return c.EndSub();
+	}
+	
+	public static void CopyToBitmap(this SKBitmap bitMap, int[] fullTex) {
+		var handle = GCHandle.Alloc(fullTex, GCHandleType.Pinned);
+		try {
+			var pointer = handle.AddrOfPinnedObject();
+			bitMap.SetPixels(pointer);
+		}
+		finally {
+			if (handle.IsAllocated)
+				handle.Free();
+		}
 	}
 }

@@ -5,7 +5,7 @@ using System.IO;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
-namespace ServaMap.Server; 
+namespace ServaMap.Server;
 
 /// <summary>
 /// A mod system that strictly interacts with a database.
@@ -15,7 +15,6 @@ public abstract class DatabaseHandlerModSystem<T> : ModSystem {
 	protected PersistedConfiguration config;
 
 	protected SQLiteConnection conn;
-	protected string dBFullPath;
 	protected ILogger logger;
 	protected ICoreServerAPI serverAPI;
 
@@ -30,22 +29,10 @@ public abstract class DatabaseHandlerModSystem<T> : ModSystem {
 		logger = serverAPI.Logger;
 
 		config = ServaMapServerMod.GetConfig(api);
-		dBFullPath = config.GetSubPath(serverAPI, config.DBFileName);
-		
-		InitializeCoreDatabase();
-		InitializeDatabase();
-	}
 
-	/// <summary>
-	///   Opens the database, or creates it if needed.
-	/// </summary>
-	private void InitializeCoreDatabase() {
-		if (!File.Exists(dBFullPath))
-			SQLiteConnection.CreateFile(dBFullPath);
-		var connBuilder = new SQLiteConnectionStringBuilder();
-		connBuilder.DataSource = dBFullPath;
-		conn = new SQLiteConnection(connBuilder.ToString());
-		conn.Open();
+		conn = serverAPI.ModLoader.GetModSystem<ServaMapServerMod>().dbConnection;
+
+		InitializeDatabase();
 	}
 
 	public abstract void InitializeDatabase();

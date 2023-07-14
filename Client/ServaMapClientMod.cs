@@ -44,6 +44,7 @@ public class ServaMapClientMod : ModSystem {
 
 		clientAPI.Event.LevelFinalize += OnLevelFinalize;
 		clientAPI.Event.LeftWorld += OnLeftWorld;
+		clientAPI.Event.ChunkDirty += EventOnChunkDirty;
 
 		clientAPI.ChatCommands.Create("servamapclient")
 				.WithDesc("Control the Serv-a-Map client mod.")
@@ -119,8 +120,8 @@ public class ServaMapClientMod : ModSystem {
 	private void DesginatorHandler(Dictionary<int, int> designators) {
 		logger.Notification($"Got {designators.Count} designators.");
 		chunkRenderer = new ChunkRenderer(clientAPI, designators);
-		clientAPI.Event.ChunkDirty += EventOnChunkDirty;
-		RegisterGameTickListener();
+		if (clientConfig.Render)
+			RegisterGameTickListener();
 	}
 
 	private void RegisterGameTickListener() {

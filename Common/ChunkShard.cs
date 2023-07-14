@@ -2,6 +2,8 @@ using System;
 
 using ProtoBuf;
 
+using SkiaSharp;
+
 using Vintagestory.API.MathTools;
 
 namespace ServaMap;
@@ -20,6 +22,15 @@ public record ChunkShard {
 
 	[ProtoMember(2)]
 	public int[] ShardImage { get; set; }
+	
+	public SKBitmap ToBitmap() {
+		var size = (int)Math.Sqrt(ShardImage.Length);
+		if (size * size != ShardImage.Length)
+			return null;
+		var bitmap = new SKBitmap(size, size, true);
+		bitmap.CopyToBitmap(ShardImage);
+		return bitmap;
+	}
 
 	// Set by the server because there is no way to be sure the client hasn't changed their computer's time.
 	[ProtoIgnore]

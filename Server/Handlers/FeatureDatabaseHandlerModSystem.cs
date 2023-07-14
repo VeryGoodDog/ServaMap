@@ -26,7 +26,7 @@ public abstract class FeatureDatabaseHandlerModSystem<T> : DatabaseHandlerModSys
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
 		var jsonFilename = Path.ChangeExtension(TableName, "geojson");
-		jsonFilePath = Path.Combine(config.GetServerMapFullPath(serverAPI), jsonFilename);
+		jsonFilePath = Path.Combine(config.GetOrCreateServerMapFullDirectory(serverAPI), jsonFilename);
 	}
 
 	public abstract Result<bool> ProcessFeature(T toProcess);

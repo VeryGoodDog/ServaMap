@@ -22,7 +22,19 @@ public class PersistedConfiguration {
 
 	public string ShardTextureDataPath { get; set; } = "shardTextureData";
 
+	public string TilePath { get; set; } = "tiles";
+
 	public int GeoJsonAutoExportIntervalSeconds { get; set; } = 10;
+
+	public int TileResampleIntervalSeconds { get; set; } = 30;
+
+	public int TileMaxScaleLevel { get; set; } = 4;
+	
+	/// <summary>
+	/// The size of tiles in terms of the shard size.
+	/// eg, 4 is 4 x 4 shards, at 32px x 32px shards that's 128px x 128px tiles.
+	/// </summary>
+	public int TileResampleSize { get; set; } = 4;
 
 	//All - Designators, setup
 	public Dictionary<AssetLocation, Color> BlockReplacementDesignators { get; set; } = new() {
@@ -59,7 +71,7 @@ public class PersistedConfiguration {
 	/// </summary>
 	/// <param name="api">The server API.</param>
 	/// <returns></returns>
-	public string GetServerMapFullPath(ICoreServerAPI api) {
+	public string GetOrCreateServerMapFullDirectory(ICoreServerAPI api) {
 		if (serverMapFullPath is null) {
 			var worldId = Path.GetFileNameWithoutExtension(api.WorldManager.CurrentWorldName);
 			var finalPath = Path.Combine(ServerMapPath, worldId);
@@ -68,6 +80,10 @@ public class PersistedConfiguration {
 		return serverMapFullPath;
 	}
 
-	public string GetSubPath(ICoreServerAPI api, string subPath) =>
-			Path.Combine(GetServerMapFullPath(api), subPath);
+	public string GetOrCreateSubDirectory(ICoreServerAPI api, string subPath) {
+		var fullSubPath = Path.Combine(GetOrCreateServerMapFullDirectory(api), subPath);
+		if (!Directory.Exists(fullSubPath))
+			Directory.CreateDirectory(fullSubPath);
+		return fullSubPath;
+	}
 }

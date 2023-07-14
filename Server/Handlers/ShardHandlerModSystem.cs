@@ -16,7 +16,8 @@ namespace ServaMap.Server;
 
 public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard> {
 	private int chunkSize => serverAPI.World.BlockAccessor.ChunkSize;
-	private string shardTexturePath => config.GetSubPath(serverAPI, config.ShardTextureDataPath);
+	private string shardTexturePath => config.GetOrCreateSubDirectory(serverAPI, config.ShardTextureDataPath);
+	private TileHandlerModSystem tileHandlerModSystem => serverAPI.ModLoader.GetModSystem<TileHandlerModSystem>();
 
 	public override string TableName => "chunks";
 
@@ -30,7 +31,11 @@ public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard>
 					foreach (var chunkShard in shards) {
 						chunkShard.GenerationTime = DateTime.UtcNow;
 						chunkShard.GeneratingPlayerId = serverPlayer.PlayerUID;
-						ProcessFeature(chunkShard);
+						var res = ProcessFeature(chunkShard);
+						if (res.IsException)
+							logger.Error(res.Exception);
+						else if (res.Good)
+							tileHandlerModSystem.AddShardToTile(chunkShard);
 					}
 				});
 
@@ -146,7 +151,7 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 			return rowsAffected > 0;
 		}
 		catch (Exception e) {
-			logger.Error("Serv-a-Map failed to test if a chunk shard should update.");
+			logger.Error("Serv-a-Map failed to update a shard.");
 			logger.Error(e.ToString());
 			return e;
 		}
@@ -236,7 +241,7 @@ WHERE x = $x
 
 		logger.Notification("starting write");
 
-		var fullMapPath = Path.Combine(config.GetServerMapFullPath(serverAPI), "fullmap.png");
+		var fullMapPath = Path.Combine(config.GetOrCreateServerMapFullDirectory(serverAPI), "fullmap.png");
 
 		var exception = WriteBitmapToFile(width, height, fullTex, fullMapPath);
 		
@@ -251,7 +256,7 @@ WHERE x = $x
 	private Exception WriteBitmapToFile(int width, int height, int[] fullTex, string fullMapPath) {
 		try {
 			using var bitMap = new SKBitmap(width, height, true);
-			CopyToBitmap(fullTex, bitMap);
+			bitMap.CopyToBitmap(fullTex);
 			using var file = File.OpenWrite(fullMapPath);
 			bitMap.Encode(SKEncodedImageFormat.Png, 100).SaveTo(file);
 		}
@@ -261,18 +266,6 @@ WHERE x = $x
 			return e;
 		}
 		return null;
-	}
-
-	private static void CopyToBitmap(int[] fullTex, SKBitmap bitMap) {
-		var handle = GCHandle.Alloc(fullTex, GCHandleType.Pinned);
-		try {
-			var pointer = handle.AddrOfPinnedObject();
-			bitMap.SetPixels(pointer);
-		}
-		finally {
-			if (handle.IsAllocated)
-				handle.Free();
-		}
 	}
 
 	private void InsertIntoFullTexture(List<(Vec2i, int[])> texs, Vec2i origin, int width, int[] fullTex) {
