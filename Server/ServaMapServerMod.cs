@@ -1,6 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
 
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -16,6 +20,8 @@ public class ServaMapServerMod : ModSystem {
 	private ILogger logger;
 
 	private IServerNetworkChannel networkChannel;
+	private HttpListener listener = new HttpListener();
+	private string tilePath;
 
 	private ICoreServerAPI serverAPI;
 
@@ -50,12 +56,52 @@ public class ServaMapServerMod : ModSystem {
 		var dBFullFilePath = Path.Combine(CachedConfiguration.GetOrCreateServerMapFullDirectory(api),
 				CachedConfiguration.DBFileName);
 
+		
 		if (!File.Exists(dBFullFilePath))
 			SQLiteConnection.CreateFile(dBFullFilePath);
 		var connBuilder = new SQLiteConnectionStringBuilder();
 		connBuilder.DataSource = dBFullFilePath;
 		dbConnection = new SQLiteConnection(connBuilder.ToString());
 		dbConnection.Open();
+
+		listener.Prefixes.Add(CachedConfiguration.TileApiUrlPrefix);
+		listener.Start();
+		
+		tilePath = Path.Combine(CachedConfiguration.GetOrCreateServerMapFullDirectory(api), CachedConfiguration.TilePath);
+
+		Task.Run(() => {
+			logger.Notification("Starting listener task!");
+			while (listener.IsListening)
+				listener.BeginGetContext(ListenerCallback, listener).AsyncWaitHandle.WaitOne();
+		});
+		
+		serverAPI.Event.ServerRunPhase(EnumServerRunPhase.Shutdown,
+				() => listener.Stop());
+	}
+
+	private void ListenerCallback(IAsyncResult result) {
+		var lis = (HttpListener)result.AsyncState;
+		var context = lis.EndGetContext(result);
+		var request = context.Request;
+		var response = context.Response;
+
+		var loc = request.Url;
+		var localLoc = tilePath + loc.LocalPath;
+		
+
+		byte[] buffer;
+		if (File.Exists(localLoc)) {
+			buffer = File.ReadAllBytes(localLoc);
+			response.StatusCode = 200;
+		}
+		else {
+			buffer = Encoding.UTF8.GetBytes("<html><body>file not found</body></html>");
+			response.StatusCode = 404;
+		}
+
+		response.ContentLength64 = buffer.Length;
+		response.OutputStream.Write(buffer, 0, buffer.Length);
+		response.OutputStream.Close();
 	}
 
 	public static PersistedConfiguration GetConfig(ICoreServerAPI api) =>

@@ -35,6 +35,8 @@ public class PersistedConfiguration {
 	/// eg, 4 is 4 x 4 shards, at 32px x 32px shards that's 128px x 128px tiles.
 	/// </summary>
 	public int TileResampleSize { get; set; } = 4;
+	
+	public string TileApiUrlPrefix { get; set; } = "http://localhost:8080/";
 
 	//All - Designators, setup
 	public Dictionary<AssetLocation, Color> BlockReplacementDesignators { get; set; } = new() {
