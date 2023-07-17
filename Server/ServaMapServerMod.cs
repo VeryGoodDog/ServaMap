@@ -21,11 +21,12 @@ public class ServaMapServerMod : ModSystem {
 
 	private IServerNetworkChannel networkChannel;
 	private HttpListener listener = new HttpListener();
-	private string tilePath;
+
+	private string webmapPath => config.GetOrCreateSubDirectory(serverAPI, config.WebMapPath);
 
 	private ICoreServerAPI serverAPI;
 
-	internal PersistedConfiguration CachedConfiguration {
+	internal PersistedConfiguration config {
 		get => serverAPI.ObjectCache[_configFilename] as PersistedConfiguration;
 		set => serverAPI.ObjectCache.Add(_configFilename, value);
 	}
@@ -45,7 +46,7 @@ public class ServaMapServerMod : ModSystem {
 		networkChannel = serverAPI.Network.RegisterChannel(NetworkChannelName)
 				.RegisterMessageType<ReadyPacket>()
 				.SetMessageHandler((IServerPlayer serverPlayer, ReadyPacket _) => {
-					var designators = CachedConfiguration.GetDesignatorsAsInts(serverAPI);
+					var designators = config.GetDesignatorsAsInts(serverAPI);
 					logger.Notification($"Sending designators to {serverPlayer.PlayerName}.");
 					networkChannel.SendPacket(designators, serverPlayer);
 				})
@@ -53,10 +54,9 @@ public class ServaMapServerMod : ModSystem {
 
 		serverAPI.Event.GameWorldSave += () => PersistParameterChange();
 
-		var dBFullFilePath = Path.Combine(CachedConfiguration.GetOrCreateServerMapFullDirectory(api),
-				CachedConfiguration.DBFileName);
+		var dBFullFilePath = Path.Combine(config.GetOrCreateServerMapFullDirectory(api),
+				config.DBFileName);
 
-		
 		if (!File.Exists(dBFullFilePath))
 			SQLiteConnection.CreateFile(dBFullFilePath);
 		var connBuilder = new SQLiteConnectionStringBuilder();
@@ -64,19 +64,16 @@ public class ServaMapServerMod : ModSystem {
 		dbConnection = new SQLiteConnection(connBuilder.ToString());
 		dbConnection.Open();
 
-		listener.Prefixes.Add(CachedConfiguration.TileApiUrlPrefix);
+		listener.Prefixes.Add(config.TileApiUrlPrefix);
 		listener.Start();
-		
-		tilePath = Path.Combine(CachedConfiguration.GetOrCreateServerMapFullDirectory(api), CachedConfiguration.TilePath);
 
 		Task.Run(() => {
 			logger.Notification("Starting listener task!");
 			while (listener.IsListening)
 				listener.BeginGetContext(ListenerCallback, listener).AsyncWaitHandle.WaitOne();
 		});
-		
-		serverAPI.Event.ServerRunPhase(EnumServerRunPhase.Shutdown,
-				() => listener.Stop());
+
+		serverAPI.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => listener.Stop());
 	}
 
 	private void ListenerCallback(IAsyncResult result) {
@@ -86,8 +83,7 @@ public class ServaMapServerMod : ModSystem {
 		var response = context.Response;
 
 		var loc = request.Url;
-		var localLoc = tilePath + loc.LocalPath;
-		
+		var localLoc = webmapPath + loc.LocalPath;
 
 		byte[] buffer;
 		if (File.Exists(localLoc)) {
@@ -95,7 +91,7 @@ public class ServaMapServerMod : ModSystem {
 			response.StatusCode = 200;
 		}
 		else {
-			buffer = Encoding.UTF8.GetBytes("<html><body>file not found</body></html>");
+			buffer = Encoding.UTF8.GetBytes($"<html><body>file not found</body></html>");
 			response.StatusCode = 404;
 		}
 
@@ -108,23 +104,23 @@ public class ServaMapServerMod : ModSystem {
 			api.ObjectCache[_configFilename] as PersistedConfiguration;
 
 	private void PrepareConfig() {
-		PersistedConfiguration config = null;
+		PersistedConfiguration newConfig = null;
 		try {
-			config = serverAPI.LoadModConfig<PersistedConfiguration>(_configFilename);
+			newConfig = serverAPI.LoadModConfig<PersistedConfiguration>(_configFilename);
 		}
 		catch {
 			logger.Error("Failed to reload config.");
 		}
 
-		if (config == null) {
+		if (newConfig == null) {
 			logger.Warning("Regenerating default config as it was missing / unparsable...");
-			config = new PersistedConfiguration();
-			serverAPI.StoreModConfig(config, _configFilename);
+			newConfig = new PersistedConfiguration();
+			serverAPI.StoreModConfig(newConfig, _configFilename);
 		}
 
 		logger.Notification($"Loaded config from {_configFilename}");
-		CachedConfiguration = config;
+		config = newConfig;
 	}
 
-	internal void PersistParameterChange() => serverAPI.StoreModConfig(CachedConfiguration, _configFilename);
+	internal void PersistParameterChange() => serverAPI.StoreModConfig(config, _configFilename);
 }

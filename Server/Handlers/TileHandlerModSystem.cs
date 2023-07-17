@@ -12,7 +12,7 @@ using Vintagestory.API.Server;
 namespace ServaMap.Server;
 
 public class TileHandlerModSystem : DatabaseHandlerModSystem<Tile> {
-	private string tilePath => config.GetOrCreateSubDirectory(serverAPI, config.TilePath);
+	private string tilePath => config.GetOrCreateWebMapSubDirectory(serverAPI, config.MapApiDataPath, config.TilePath);
 	private int tileResampleSize => config.TileResampleSize;
 	private int tileSize => chunkSize * tileResampleSize;
 
@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		var res = GetTile(tile);
 		if (res.IsException) {
 			logger.Error(res.Exception);
+			if (res.Exception.InnerException is { } inner)
+				logger.Error(inner);
 			return;
 		}
 		// the tile didnt exist
@@ -282,7 +284,7 @@ VALUES ($x, $y, $scale_level)
 			var baseDeleteRes = DeleteAllButBaseTiles();
 			if (baseDeleteRes is not null)
 				throw baseDeleteRes;
-			
+
 			using var command = conn.CreateCommand();
 			command.CommandText = $@"
 SELECT * FROM {TableName}
@@ -328,7 +330,7 @@ WHERE scale_level != 0
 			return new Exception("Serv-a-Map failed to delete all but base tiles.", e);
 		}
 	}
-	
+
 	public override Exception Clear() {
 		if (base.Clear() is { } res)
 			return res;

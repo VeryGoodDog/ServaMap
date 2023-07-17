@@ -10,11 +10,11 @@ It is still a work in progress and is missing some core features. It does have:
 - Landmark manipulation via commands.
 - Chunk tile generation.
 - The ability to export all tiles in one large image.
+- Tile resampling.
 
 It is currently missing:
 
 - Webserver hosting, the mod does not automatically host the online map.
-- Tile resampling, tiles are only exported as 1:1 32x32 pixel PNGs.
 - In-game map connection, landmarks, teleporters, and traders are not show in the in-game map.
 
 ### How it works
@@ -34,3 +34,7 @@ and updated accordingly.
 ### How to build
 
 You will need to change hint paths and `$VintageStoryInstall` in ServaMod.csproj
+
+### Bug reporting
+
+Please report bugs as issues on GitHub! Remember to include the game's logs.

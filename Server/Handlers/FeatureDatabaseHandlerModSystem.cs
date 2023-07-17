@@ -26,7 +26,10 @@ public abstract class FeatureDatabaseHandlerModSystem<T> : DatabaseHandlerModSys
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
 		var jsonFilename = Path.ChangeExtension(TableName, "geojson");
-		jsonFilePath = Path.Combine(config.GetOrCreateServerMapFullDirectory(serverAPI), jsonFilename);
+		jsonFilePath =
+				Path.Combine(
+						config.GetOrCreateWebMapSubDirectory(serverAPI, config.MapApiDataPath, config.GeoJsonPath),
+						jsonFilename);
 	}
 
 	public abstract Result<bool> ProcessFeature(T toProcess);
@@ -42,8 +45,7 @@ public abstract class FeatureDatabaseHandlerModSystem<T> : DatabaseHandlerModSys
 			writer.WriteObject(() => {
 				writer.WriteObject("crs",
 								() => {
-									writer.WriteObject("properties",
-													() => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
+									writer.WriteObject("properties", () => writer.WriteKeyValue("ame", "urn:ogc:def:crs:EPSG::3857"))
 											.WriteKeyValue("type", "name");
 								})
 						.WriteArray("features",

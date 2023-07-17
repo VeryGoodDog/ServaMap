@@ -22,20 +22,26 @@ public class PersistedConfiguration {
 
 	public string ShardTextureDataPath { get; set; } = "shardTextureData";
 
-	public string TilePath { get; set; } = "tiles";
+	public string WebMapPath { get; set; } = "webmap";
+
+	public string MapApiDataPath { get; set; } = "data";
+
+	public string TilePath { get; set; } = "world";
+
+	public string GeoJsonPath { get; set; } = "geojson";
 
 	public int GeoJsonAutoExportIntervalSeconds { get; set; } = 10;
 
 	public int TileResampleIntervalSeconds { get; set; } = 30;
 
 	public int TileMaxScaleLevel { get; set; } = 4;
-	
+
 	/// <summary>
 	/// The size of tiles in terms of the shard size.
 	/// eg, 4 is 4 x 4 shards, at 32px x 32px shards that's 128px x 128px tiles.
 	/// </summary>
 	public int TileResampleSize { get; set; } = 4;
-	
+
 	public string TileApiUrlPrefix { get; set; } = "http://localhost:8080/";
 
 	//All - Designators, setup
@@ -82,10 +88,13 @@ public class PersistedConfiguration {
 		return serverMapFullPath;
 	}
 
-	public string GetOrCreateSubDirectory(ICoreServerAPI api, string subPath) {
-		var fullSubPath = Path.Combine(GetOrCreateServerMapFullDirectory(api), subPath);
+	public string GetOrCreateSubDirectory(ICoreServerAPI api, params string[] subPath) {
+		var fullSubPath = Path.Combine(GetOrCreateServerMapFullDirectory(api), Path.Combine(subPath));
 		if (!Directory.Exists(fullSubPath))
 			Directory.CreateDirectory(fullSubPath);
 		return fullSubPath;
 	}
+
+	public string GetOrCreateWebMapSubDirectory(ICoreServerAPI api, params string[] subPath) =>
+			GetOrCreateSubDirectory(api, WebMapPath, Path.Combine(subPath));
 }
