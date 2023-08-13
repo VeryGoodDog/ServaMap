@@ -5,8 +5,8 @@
   "authors": [
     "VeryGoodDog"
   ],
-  "version": "0.0.2",
+  "version": "0.0.4",
   "dependencies": {
-    "game": "1.18.5"
+    "game": "1.18.8"
   }
 }
