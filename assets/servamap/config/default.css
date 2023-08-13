@@ -1,0 +1,57 @@
+body { overflow: hidden; padding: 0; margin: 0; height: 100vh; width: 100vw; font-family: 'Cuprum', sans-serif;}
+input, button { font-family: 'Cuprum', sans-serif; }
+#map { height: 100vh; width: 100vw; background-color: var(--mapBg);}
+#mousePos { position: absolute; bottom: 0.5vh; right: 0.5vh; font-size: 14pt; min-width: 4em; font-family: 'Fire Code', monospace; text-align: center; }
+#contributors { position: absolute; bottom: 0.5vh; left: 0.5vh; display: flex; flex-direction: row; flex-wrap: nowrap; font-size: 8pt; }
+#contributors div.left { min-width: 34.5em; }
+#contributors div.right { writing-mode: vertical-rl; color: var(--credsBtnText); min-width: 1em; border-radius: 5px; padding: 4px; margin: -4px 0; font-size: 10pt; position: relative; }
+#contributors div.right:hover { color:var(--credsBtnText); background-color: var(--credsBtnHoverBg);}
+#contributors p { margin: 0 2pt; padding: 0}
+#contributors a { color: var(--credsURLColor); }
+@supports (-moz-appearance:none) { #contributors div.right { margin-right: -8px; } }
+#layers { position: absolute; left: 0.5vh; top: max(5vh, 38pt); }
+#layers .layerSwitcherTitle { margin:4pt 0; padding: 0 0 2pt 0; border-bottom: 1px solid var(--layerSwitcherTitleSeparator); font-weight: bold;}
+#layerSwitcher { margin:4pt 0 0 0; padding: 2pt 0 2pt 2pt;}
+#layerSwitcher .layerSwitcherTitle { margin:4pt 0 8px 0; padding: 0; border-bottom: 1px solid var(--layerSwitcherLayerSeparator); font-weight: bold; }
+#layerSwitcher .layerSwitcherTitle button { font-size: 8pt; padding: 0 2pt 1pt 2pt; margin: 1pt 0 0 1pt; border-width: 1px; border-radius: 4px; position: relative; top: -2pt; float: right; height: 14pt; text-align: center; width: 2em; font-weight: bold; font-family: sans-serif;}
+#layerSwitcher .layerSwitcherTitle button:hover { background-color: var(--layerSwitcherBtnHoverBg);}
+#layerSwitcher .layerSwitcherTitle button:active { background-color: var(--layerSwitcherBtnActiveBg);}
+#layerSwitcher .layerBlock { margin: 0; padding: 0;}
+#layerSwitcher ul { margin: 0; padding: 0;}
+#layerSwitcher ul li { margin: 0; padding: 0; list-style-type: none;}
+#tools { position: absolute; top: max(5vh, 38pt); right: 0.5vh; width: 1.8em; min-height: 1em; padding: 2px; text-align: center;}
+#tools button { border: none; background: transparent; margin: 1px 0; padding: 3px; border-radius: 3px; font-size: 120%; color: var(--toolsBtnText); width: 1.5em; height: 1.5em; text-align: center; vertical-align: middle; font-family: sans-serif;}
+#tools button:hover { background-color: var(--toolsBtnHoverBg); text-shadow: -0.5px 1px 0 #000, 1px 1px 0 #000, -0.5px -0.5px 0 #000;}
+#status { position: absolute; bottom: 0.5vh; right: 0; left: 0; margin-left: auto; margin-right: auto; width: 10.5em; }
+.c { background-color: var(--boxBg); border: 3px solid var(--boxBorder); color: var(--boxText); text-shadow: -0.5px 1px 0 #000, 1px 1px 0 #000, 1px -1px 0 #000, -0.5px -0.5px 0 #000; border-radius: 8px; padding: 6px;}
+.title { margin:4pt 0 8pt 0; padding: 0 0 2pt 0; border-bottom: 2px solid var(--popupTitleBorder); font-weight: bold; font-size: 120%;}
+.popup { visibility: hidden; position: fixed; top: 50%; left: 50%; min-width: 64px; transform: translate(-50%, -50%);}
+.popup p { margin: 0 0 6px 0; }
+.popup label { display: block; margin-top: 12px; margin-bottom: 2px;}
+.popup input, .popup select { width: 100%; box-sizing: border-box; color: var(--popupInputText); background-color: var(--popupInputBg); border: 3px solid var(--popupBorder); border-radius: 4px; padding: 4px; font-size: 110%;} 
+.popup div.controls { border-top: 1px solid var(--popupControlsBorder); margin-top: 12px; padding-top: 6px; direction: rtl;}
+.popup div.controls button { margin-left: 6px; font-size: 110%; }
+.popup div.controls button:hover  { background-color: var(--popupButtonHover);}
+.popup div.controls button:active { background-color: var(--popupButtonActive);}
+.popup div.controls button.default { background-color: var(--popupButtonDefaultBg);}
+.popup div.controls button.default:hover  { background-color: var(--popupButtonDefaultBgHover);}
+.popup div.controls button.default:active { background-color: var(--popupButtonDefaultBgActive);}
+.gps { min-width: 320px; }
+.guide > div { min-width: 320px; max-width: 70vw; overflow: auto; max-height: 70vh; padding: 4px 8px 4px 4px; }
+.guide > div.title { margin-bottom: 0; }
+.guide > div.controls { margin-top: 0; }
+.guide > div a { color: var(--url); }
+.guide > div pre { border: 1px solid var(--boxBorder); padding: 8pt; width: 8em; background-color: var(--sign); }
+#popupBG { position: fixed; top: 0; left: 0; height: 100%; width: 100%; background-image: repeating-linear-gradient(45deg, var(--popupSplashBgOdd), var(--popupSplashBgOdd) 16px, var(--popupSplashBgEven) 16px, var(--popupSplashBgEven) 32px);}
+.vis { visibility: visible; }
+.sd { display: inline-block; margin-bottom: 6px; }
+.ol-zoom { top: max(5vh, 38pt); right: 0.5vh; left: unset; background-color: var(--olZoomBg); border: 3px solid var(--olZoomBorder); color: var(--olZoomText); text-shadow: -0.5px 1px 0 #000, 1px 1px 0 #000, 1px -1px 0 #000, -0.5px -0.5px 0 #000; padding: 0}
+#titleBar { position: absolute; top: 0; right: 0; left: 0; margin: 0 auto; background-color: var(--titleBarBg); width:30em; font-size: 14pt; text-align: center; padding: 0; border-bottom: 1px solid var(--titleBarBorder); border-radius: 0 0 8px 8px; }
+#titleBar ul { padding: 0; margin: 0; display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: space-around; align-items: center; }
+#titleBar ul li { display: inline-block; min-width: 6em; height: 40px; padding: 0; margin: 0 1px; vertical-align: middle; flex-grow: 1;}
+#titleBar ul li a, #titleBar ul li h1 { font-size: 100%; display: inline-block; color: var(--titleBarItemText); text-decoration: none; height: 32px; width: 100%; height: 32px; vertical-align: middle; padding-top: 8px; border: 1px solid var(--titleBarItemBorder); margin: 0;}
+#titleBar ul li:first-child h1 { border-bottom-left-radius: 8px; color: var(--titleBarItemTitle); }
+#titleBar ul li:last-child a { border-bottom-right-radius: 8px; }
+#titleBar ul li a:hover { color: var(--titleBarItemHoverText); background-color: var(--titleBarItemHoverBg); }
+#titleBar ul li a img { vertical-align: text-top; position: relative; top:-3px; }
+input[type="number"] { padding-left: 0.5em; }

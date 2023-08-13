@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+    <title>Serv-a-Map</title>
+    <meta charset="UTF-8">
+    <link rel="icon" href="favicon.svg" sizes="any" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Cuprum&family=Fira+Code:wght@400;700&family=Marcellus+SC&display=swap" rel="stylesheet">
+    <link rel="stylesheet" title="color" href="classicblue.css" type="text/css">
+    <link rel="stylesheet" href="default.css" type="text/css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.4.0/ol.css" type="text/css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v7.4.0/dist/ol.js"></script>
+    <script src="lib/ol-ext.js"></script>
+</head>
+<body>
+<div id="map" class="map"></div>
+<div id="mousePos" class="c"></div>
+<div id="layers" class="c"><div class="layerSwitcherTitle">Legend</div>
+    <div id="layerSwitcher"></div>
+</div>
+<div id="tools" class="c"></div>
+<div id="contributors" class="c">
+    <div class="left">
+        <p><a href="https://github.com/verygooddog/servamap">Webmap</a> by VeryGood.Dog.</p>
+    </div>
+    <div class="right">
+        Credits <span class="arrow">◀</span>
+    </div>
+</div>
+<div id="status" class="c">&nbsp;</div>
+<div id="titleBar">
+    <ul>
+        <li><a href="https://github.com/verygooddog/servamap/issues" class="selected">GIT / Report Bug</a></li>
+    </ul>
+</div>
+<script src="automap.js"></script>
+</body>
+</html>

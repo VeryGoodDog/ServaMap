@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="3.9996202mm"
+   height="3.5960002mm"
+   viewBox="0 0 3.9996202 3.5960002"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="home.svg"
+   inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="3440"
+     inkscape:window-height="1378"
+     id="namedview838"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:zoom="58.101354"
+     inkscape:cx="7.557672"
+     inkscape:cy="6.8055047"
+     inkscape:window-x="0"
+     inkscape:window-y="32"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg8" />
+  <defs
+     id="defs2" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     id="layer1"
+     transform="matrix(0.12845351,0,0,0.12845351,-12.759573,-8.9354705)"
+     style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.42038556;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+    <path
+       id="icon"
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:1.58885885;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 58.591797,0.62109375 1.5175781,42.794922 H 116.04492 Z M 87.818359,2.6210938 V 18.246094 l 10.982422,8.037109 0.08984,-23.6621092 z M 20.916016,46.085938 v 14.1875 h 0.002 V 105.26562 H 44.611328 V 60.273438 H 74.681641 V 105.26562 H 98.382812 V 60.273438 h 0.01758 v -14.1875 z M 47.769531,64.660156 V 105.26562 H 71.507812 V 64.660156 Z"
+       transform="matrix(0.26458333,0,0,0.26458333,99.346932,69.56784)" />
+  </g>
+</svg>
