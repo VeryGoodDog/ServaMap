@@ -396,31 +396,6 @@ class Tools {
     }
 }
 
-class Credits {
-    constructor(elementId) {
-        this.el = document.getElementById(elementId);
-        this.text = this.el.querySelector(".left");
-        this.toggler = this.el.querySelector(".right");
-        this.togglerArrow = this.el.querySelector(".arrow");
-        this.toggler.addEventListener("click", (e) => {
-            this.toggle();
-        });
-        this.state = "visible";
-    }
-
-    toggle() {
-        if (this.state === "visible") {
-            this.text.style.display = "none";
-            this.state = "hidden";
-            this.togglerArrow.textContent = "▶";
-        } else {
-            this.text.style.display = "block";
-            this.state = "visible";
-            this.togglerArrow.textContent = "◀";
-        }
-    }
-}
-
 /* ######################### View movement function ######################### */
 function goToCoords(where) {
     where = where.replace(/[\s\u00A0\t]/g, '');
@@ -881,7 +856,6 @@ switcher.buildLegend(vsLandmarks);
 poper = new PopupManager();
 tools = new Tools();
 tools.addTools();
-credits = new Credits("contributors");
 
 /* ######################### Key bindings ######################### */
 window.onkeyup = function (kp) {

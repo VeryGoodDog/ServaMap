@@ -4,9 +4,12 @@ using System.Text;
 
 using Newtonsoft.Json;
 
+using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
+using Vintagestory.Server;
 
 namespace ServaMap.Server;
 
@@ -15,16 +18,21 @@ public class TraderHandlerModSystem : FeatureDatabaseHandlerModSystem<Trader> {
 
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
-		
-		// The entities aren't initialized by this point, for some reason.
-		// This always throws an error for me. /shrug
-		// serverAPI.Event.ChunkColumnLoaded += (_, chunks) => {
-		// 	foreach (var serverChunk in chunks)
-		// 		ProcessEntities(serverChunk.Entities);
-		// };
+		var serverMain = serverAPI.World as ServerMain;
+		if (serverMain is not null) {
+			serverMain.ModEventManager.OnEntityLoaded += OnLoadOrSpawn;
+			serverMain.ModEventManager.OnEntitySpawn += OnLoadOrSpawn;
+		}
 
 		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
+	}
+
+	private void OnLoadOrSpawn(Entity entity){
+		var trader = entity as EntityTrader;
+		if (trader is null)
+			return;
+		ProcessFeature(new Trader(trader));
 	}
 
 	public override void InitializeDatabase() {
