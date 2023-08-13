@@ -15,11 +15,13 @@ public class TraderHandlerModSystem : FeatureDatabaseHandlerModSystem<Trader> {
 
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
-
-		serverAPI.Event.ChunkColumnLoaded += (_, chunks) => {
-			foreach (var serverChunk in chunks)
-				ProcessEntities(serverChunk.Entities);
-		};
+		
+		// The entities aren't initialized by this point, for some reason.
+		// This always throws an error for me. /shrug
+		// serverAPI.Event.ChunkColumnLoaded += (_, chunks) => {
+		// 	foreach (var serverChunk in chunks)
+		// 		ProcessEntities(serverChunk.Entities);
+		// };
 
 		serverAPI.Event.RegisterGameTickListener(_ => WriteGeoJson(),
 				config.GeoJsonAutoExportIntervalSeconds * 1000);
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
 	}
 
 	public void ProcessEntities(Entity[] entities) {
-		if (entities is null)
+		if (entities is null || entities.Length == 0)
 			return;
 		foreach (var entity in entities) {
 			var trader = entity as EntityTrader;

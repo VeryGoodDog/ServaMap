@@ -40,7 +40,7 @@ public class TeleporterHandlerModSystem : FeatureDatabaseHandlerModSystem<Telepo
 			return;
 
 		Delete(new Teleporter {
-			Start = blockSelection.Position
+			Start = blockSelection.Position.ToLocalPosition(serverAPI)
 		});
 	}
 

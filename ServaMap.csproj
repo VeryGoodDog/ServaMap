@@ -6,7 +6,7 @@
         <ProjectGuid>{0287E0DF-B785-40E8-BB50-2D684B45FC61}</ProjectGuid>
         <OutputType>Library</OutputType>
         <RootNamespace>ServerMap</RootNamespace>
-        <TargetFramework>net48</TargetFramework>
+        <TargetFramework>net7.0</TargetFramework>
         <LangVersion>10</LangVersion>
         <VintageStoryInstall>\home\ah\Documents\devStuff\vintagestory\vsdevdirs\serv_automap</VintageStoryInstall>
         <PackageId>ServaMap</PackageId>
@@ -29,12 +29,10 @@
         <ConsolePause>false</ConsolePause>
     </PropertyGroup>
     <ItemGroup>
-        <!--    <Reference Include="System" />-->
         <Reference Include="System.Data.SQLite">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\System.Data.SQLite.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="System.Drawing.Primitives" />
         <Reference Include="VintagestoryAPI">
             <HintPath>\home\ah\ApplicationData\vintagestory\VintagestoryAPI.dll</HintPath>
             <Private>False</Private>
@@ -55,13 +53,10 @@
             <HintPath>\home\ah\ApplicationData\vintagestory\Mods\VSSurvivalMod.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="System.Drawing" />
-        <Reference Include="System.Web" />
         <Reference Include="protobuf-net">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\protobuf-net.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="System.Xml" />
         <Reference Include="Newtonsoft.Json">
             <HintPath>\home\ah\ApplicationData\vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
             <Private>False</Private>
@@ -73,6 +68,12 @@
     </ItemGroup>
 
     <Target Name="CustomAfterBuild" AfterTargets="Build">
+        <RemoveDir Directories="$(OutputPath)\assets" />
+        <RemoveDir Directories="$(VintageStoryInstall)/Mods/$(AssemblyName)\assets" />
+        <ItemGroup>
+            <AssetFiles Include="assets\**\*.*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(AssetFiles)" DestinationFolder="$(OutputPath)\assets\%(RecursiveDir)" />
         <MakeDir Directories="$(VintageStoryInstall)\Mods\$(AssemblyName)" />
         <Exec Command="cp -r $(OutputPath)* $(VintageStoryInstall)/Mods/$(AssemblyName)" />
     </Target>

@@ -4,16 +4,17 @@ using Vintagestory.GameContent;
 namespace ServaMap;
 
 public record Teleporter {
-	public BlockPos Start { get; set; }
-	public BlockPos End { get; set; }
+	public Vec3i Start { get; set; }
+	public Vec3i End { get; set; }
 	public string Label { get; set; }
 	public string Tag { get; set; }
 
 	public Teleporter() { }
 
 	public Teleporter(BlockEntityTeleporterBase teleporter) {
-		Start = teleporter.Pos;
-		End = teleporter.Target();
+		var api = teleporter.Api;
+		Start = teleporter.Pos.ToLocalPosition(api);
+		End = teleporter.Target().ToLocalPosition(api);
 		Label = "";
 		Tag = "";
 	}

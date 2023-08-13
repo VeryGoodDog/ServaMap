@@ -13,10 +13,12 @@ namespace ServaMap.Server;
 
 public class TileHandlerModSystem : DatabaseHandlerModSystem<Tile> {
 	private string tilePath => config.GetOrCreateWebMapSubDirectory(serverAPI, config.MapApiDataPath, config.TilePath);
-	private int tileResampleSize => config.TileResampleSize;
+	private int tileResampleSize => config.ShardToTileResampleSize;
 	private int tileSize => chunkSize * tileResampleSize;
 
 	private int chunkSize => serverAPI.World.BlockAccessor.ChunkSize;
+	private int baseChunkOffsetX => serverAPI.World.BlockAccessor.MapSizeX / tileResampleSize / chunkSize / 2;
+	private int baseChunkOffsetY => serverAPI.World.BlockAccessor.MapSizeZ / tileResampleSize / chunkSize / 2;
 
 	public override string TableName => "tiles";
 
@@ -56,10 +58,10 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		var shardX = shard.ChunkCoords.X;
 		var shardY = shard.ChunkCoords.Y;
 
-		var tileX = shardX / tileResampleSize;
-		var tileY = shardY / tileResampleSize;
+		var tileX = shardX / tileResampleSize - baseChunkOffsetX;
+		var tileY = shardY / tileResampleSize - baseChunkOffsetY;
 
-		var scaleLevel = 0;
+		var scaleLevel = config.TileMaxScaleLevel;
 
 		var tile = new Tile(scaleLevel, tileX, tileY);
 
@@ -135,18 +137,19 @@ CREATE TABLE IF NOT EXISTS {TableName}
 
 	private Result<Tile[]> GetSubTiles(Tile tile) {
 		var scaleLevel = tile.ScaleLevel;
-		if (scaleLevel == 0)
-			return new ArgumentOutOfRangeException("tile", "Tile's scale level was less than 1!");
-		var x = tile.X;
-		var y = tile.Y;
-		var subScaleLevel = scaleLevel - 1;
-		var offset = 1 << subScaleLevel;
+		if (scaleLevel == config.TileMaxScaleLevel)
+			return new ArgumentOutOfRangeException("tile", "Tile's scale level was too big!");
+		var x = tile.X * 2;
+		var y = tile.Y * 2;
+		var subScaleLevel = scaleLevel + 1;
+		var offsetX = 1;
+		var offsetY = 1;
 
 		var subTiles = new[] {
 			new Tile(subScaleLevel, x, y),
-			new Tile(subScaleLevel, x, y + offset),
-			new Tile(subScaleLevel, x + offset, y),
-			new Tile(subScaleLevel, x + offset, y + offset)
+			new Tile(subScaleLevel, x, y + offsetY),
+			new Tile(subScaleLevel, x + offsetX, y),
+			new Tile(subScaleLevel, x + offsetX, y + offsetY)
 		};
 
 		foreach (var subTile in subTiles) {
@@ -222,8 +225,8 @@ WHERE x = $x AND y = $y and scale_level = $scale_level
 			if (subTileBm is null)
 				throw new NullReferenceException("SubTile's texture is null!");
 
-			var tileSubX = Math.Sign(subTile.X - tile.X) * (tileSize / 2);
-			var tileSubY = Math.Sign(subTile.Y - tile.Y) * (tileSize / 2);
+			var tileSubX = Math.Abs(subTile.X % 2) * (tileSize / 2);
+			var tileSubY = Math.Abs(subTile.Y % 2) * (tileSize / 2);
 
 			var resizedTile = subTileBm.Resize(new SKSizeI(tileSize / 2, tileSize / 2), SKFilterQuality.High);
 
@@ -258,7 +261,7 @@ VALUES ($x, $y, $scale_level)
 			command.Parameters.AddWithValue("$scale_level", tile.ScaleLevel);
 			command.ExecuteNonQuery();
 
-			if (tile.ScaleLevel < config.TileMaxScaleLevel) {
+			if (tile.ScaleLevel > 0) {
 				AddSuperTileToResample(tile);
 			}
 
@@ -270,10 +273,10 @@ VALUES ($x, $y, $scale_level)
 	}
 
 	private void AddSuperTileToResample(Tile tile) {
-		var superScale = tile.ScaleLevel + 1;
-		var x = (tile.X >> superScale) << superScale;
-		var y = (tile.Y >> superScale) << superScale;
-
+		var superScale = tile.ScaleLevel - 1;
+		var x = tile.X == -1 ? -1 : (tile.X / 2);
+		var y = tile.Y == -1 ? -1 : (tile.Y / 2);
+		
 		var superTile = new Tile(superScale, x, y);
 		if (!toResample.Contains(superTile))
 			toResample.Enqueue(superTile);
@@ -314,14 +317,14 @@ WHERE scale_level = 0
 			var tilePaths = Directory.GetFiles(tilePath);
 			foreach (var thisTilePath in tilePaths) {
 				var basePath = Path.GetFileName(thisTilePath);
-				if (!basePath.StartsWith("0"))
+				if (!basePath.StartsWith(config.TileMaxScaleLevel.ToString()))
 					File.Delete(thisTilePath);
 			}
 
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
 DELETE FROM {TableName}
-WHERE scale_level != 0
+WHERE scale_level != {config.TileMaxScaleLevel}
 ";
 			command.ExecuteNonQuery();
 			return null;
