@@ -5,8 +5,13 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+using Newtonsoft.Json;
+
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.Common.Database;
+using Vintagestory.Server;
 
 namespace ServaMap.Server;
 
@@ -26,23 +31,7 @@ public class ServaMapWebServerSystem : ModSystem {
 		serverAPI = api;
 		logger = serverAPI.Logger;
 
-		var assets = serverAPI.Assets.GetMany("config", "servamap");
-
-		foreach (var asset in assets) {
-			var assetPath = asset.Location.Path;
-			var assetData = asset.Data;
-			if (assetData is null) {
-				logger.Error($"ServaMap failed to load ${asset.Name}! The webmap will probably break.");
-				continue;
-			}
-			var combinedPath = Path.Combine(webmapPath, assetPath);
-			if (File.Exists(combinedPath))
-				continue;
-			var dir = Path.GetDirectoryName(combinedPath);
-			if (!Directory.Exists(dir))
-				Directory.CreateDirectory(dir!);
-			File.WriteAllBytes(combinedPath, assetData);
-		}
+		TransferWebMapAssets();
 
 		listener.Prefixes.Add(config.WebServerUrlPrefix);
 		listener.Start();
@@ -53,7 +42,31 @@ public class ServaMapWebServerSystem : ModSystem {
 				listener.BeginGetContext(ListenerCallback, listener).AsyncWaitHandle.WaitOne();
 		});
 
+		serverAPI.Event.SaveGameLoaded += WriteWorldOriginInfo;
+
 		serverAPI.Event.ServerRunPhase(EnumServerRunPhase.Shutdown, () => listener.Stop());
+	}
+
+	private void TransferWebMapAssets() {
+		var assets = serverAPI.Assets.GetMany("config", "servamap");
+
+		foreach (var asset in assets) {
+			var assetPath = asset.Location.Path;
+			var assetData = asset.Data;
+			if (assetData is null) {
+				logger.Error($"ServaMap failed to load ${asset.Name}! The webmap will probably break.");
+				continue;
+			}
+			var combinedPath = Path.Combine(webmapPath, assetPath);
+			#if !DEBUG
+			if (File.Exists(combinedPath))
+				continue;
+			#endif
+			var dir = Path.GetDirectoryName(combinedPath);
+			if (!Directory.Exists(dir))
+				Directory.CreateDirectory(dir!);
+			File.WriteAllBytes(combinedPath, assetData);
+		}
 	}
 
 	private void ListenerCallback(IAsyncResult result) {
@@ -78,5 +91,20 @@ public class ServaMapWebServerSystem : ModSystem {
 		response.ContentLength64 = buffer.Length;
 		response.OutputStream.Write(buffer, 0, buffer.Length);
 		response.OutputStream.Close();
+	}
+
+	private void WriteWorldOriginInfo() {
+		var serverMain = serverAPI.World as ServerMain;
+		var mm = serverMain.MapSize / 2;
+		var dsp = serverMain.DefaultSpawnPosition.XYZInt;
+		var worldOriginOffset = new Vec3i(dsp.X - mm.X, dsp.Y - mm.Y, dsp.Z - mm.Z);
+
+		var infoPath = Path.Combine(config.GetOrCreateWebMapSubDirectory(serverAPI, config.MapApiDataPath),
+				"worldOriginOffset.json");
+		using var stream = new StreamWriter(infoPath, false, Encoding.UTF8);
+		using var writer = new JsonTextWriter(stream);
+		writer.Formatting = Formatting.None;
+		writer.WriteObject(() =>
+				writer.WriteArray("worldOriginOffset", worldOriginOffset.X, worldOriginOffset.Y, worldOriginOffset.Z));
 	}
 }

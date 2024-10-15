@@ -19,4 +19,12 @@ public record Tile {
 	}
 	
 	public string TilePath => $"{ScaleLevel}_{X}_{Y}.png";
+
+	public override int GetHashCode() {
+		int textureHash = 0;
+		var texBytes = Texture.Bytes;
+		for (int i = 0; i < texBytes.Length; i += 4)
+			textureHash ^= texBytes[i + 0] << 24 | texBytes[i + 1] << 16 | texBytes[i + 2] << 8 | texBytes[i + 3] << 0;
+		return textureHash ^ X ^ Y ^ ScaleLevel;
+	}
 }

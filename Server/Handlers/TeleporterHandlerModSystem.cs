@@ -50,16 +50,17 @@ public class TeleporterHandlerModSystem : FeatureDatabaseHandlerModSystem<Telepo
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
-    start_x UNIQUE,
-    start_y UNIQUE,
-    start_z UNIQUE,
+    start_x NOT NULL,
+    start_y NOT NULL,
+    start_z NOT NULL,
     
-    end_x UNIQUE,
-    end_y UNIQUE,
-    end_z UNIQUE,
+    end_x NOT NULL,
+    end_y NOT NULL,
+    end_z NOT NULL,
     
     label NOT NULL,
-    tag NOT NULL
+    tag NOT NULL,
+    UNIQUE (start_x, start_y, start_z, end_x, end_y, end_z)
 )
 ";
 			command.ExecuteNonQuery();

@@ -35,8 +35,9 @@ public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard>
 						if (res.IsException)
 							logger.Error(res.Exception);
 						else if (res.Good)
-							tileHandlerModSystem.AddShardToTile(chunkShard);
+							shardsToAdd.Add(chunkShard);
 					}
+					tileHandlerModSystem.AddLotsOfShardsToTiles(shardsToAdd);
 				});
 
 		serverAPI.ChatCommands.GetOrCreate("servamapadmin")
@@ -52,12 +53,13 @@ public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard>
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
-    x UNIQUE,
-    y UNIQUE,
+    x NOT NULL,
+    y NOT NULL,
     
-    generation_time UNIQUE,
-    image_hash UNIQUE,
-    generating_player_id NOT NULL
+    generation_time NOT NULL,
+    image_hash NOT NULL,
+    generating_player_id NOT NULL,
+	UNIQUE (x, y, generation_time, image_hash)
 )
 ";
 			command.ExecuteNonQuery();
@@ -77,14 +79,18 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		if (shard.ShardImage.Length != chunkSize * chunkSize)
 			return new ArgumentException(
 					$"Given chunk shard is an invalid size. Expected {chunkSize * chunkSize}, got {shard.ShardImage.Length}.");
+		
 		var shouldUpdate = ShouldUpdate(shard);
+		
 		if (shouldUpdate.IsException)
 			return shouldUpdate;
 		if (!shouldUpdate.Good)
 			return false;
 		var writeRes = WriteImage(shard);
+		
 		if (writeRes is not null)
 			return writeRes;
+		
 		return Update(shard);
 	}
 
@@ -116,13 +122,12 @@ SELECT * FROM {TableName}
 WHERE x = $x
   AND y = $y
   AND image_hash = $image_hash
-  AND generation_time >= $new_generation_time
 ";
 			command.Parameters.AddWithValue("$x", shard.ChunkCoords.X);
 			command.Parameters.AddWithValue("$y", shard.ChunkCoords.Y);
 
 			command.Parameters.AddWithValue("$new_generation_time", shard.GenerationTime);
-			command.Parameters.AddWithValue("$image_hash", shard.ShardImage.GetHashCode());
+			command.Parameters.AddWithValue("$image_hash", shard.TextureHash());
 			var reader = command.ExecuteReader();
 			// This is a totally new shard.
 			return !reader.HasRows;
@@ -145,7 +150,7 @@ VALUES ($x, $y, $generation_time, $image_hash, $generating_player_id)
 			command.Parameters.AddWithValue("$y", shard.ChunkCoords.Y);
 
 			command.Parameters.AddWithValue("$generation_time", shard.GenerationTime);
-			command.Parameters.AddWithValue("$image_hash", shard.ShardImage.GetHashCode());
+			command.Parameters.AddWithValue("$image_hash", shard.TextureHash());
 			command.Parameters.AddWithValue("$generating_player_id", shard.GeneratingPlayerId);
 			var rowsAffected = command.ExecuteNonQuery();
 			return rowsAffected > 0;
@@ -244,7 +249,7 @@ WHERE x = $x
 		var fullMapPath = Path.Combine(config.GetOrCreateServerMapFullDirectory(serverAPI), "fullmap.png");
 
 		var exception = WriteBitmapToFile(width, height, fullTex, fullMapPath);
-		
+
 		if (exception is not null)
 			return exception;
 

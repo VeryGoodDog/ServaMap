@@ -27,7 +27,7 @@ public class LandmarkHandlerModSystem : FeatureDatabaseHandlerModSystem<Landmark
 				.WithSub("add",
 						command => command.WithAlias("update", "new", "create")
 								.WithDesc("Add or update a landmark in the server's map.")
-								.WithArgs(parsers.Word("type"), parsers.All("label"))
+								.WithArgs(parsers.Word("color"), parsers.Word("icon"), parsers.All("label"))
 								.HandleWith(LandmarkAddHandler))
 				.WithSub("list",
 						command => command.WithDesc("List landmarks")
@@ -57,12 +57,14 @@ public class LandmarkHandlerModSystem : FeatureDatabaseHandlerModSystem<Landmark
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
-    x UNIQUE,
-    y UNIQUE,
-    z UNIQUE,
+    x NOT NULL,
+    y NOT NULL,
+    z NOT NULL,
     label NOT NULL,
-    type NOT NULL,
-    creator_id UNIQUE
+    color NOT NULL,
+    icon NOT NULL,
+    creator_id NOT NULL,
+    UNIQUE (x, y, z, label, color, icon, creator_id)
 )
 ";
 			command.ExecuteNonQuery();
@@ -77,6 +79,8 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		var shouldUpdate = ShouldUpdate(landmark);
 		if (shouldUpdate.IsException)
 			return shouldUpdate;
+		if (!shouldUpdate.Good)
+			return true;
 		var update = Update(landmark);
 		if (update.IsGood)
 			return true;
@@ -93,7 +97,8 @@ WHERE x = $x
   AND z = $z
   
   AND label = $label
-  AND type = $type
+  AND color = $color
+  AND icon = $icon
   AND creator_id = $creator_id
 ";
 			command.Parameters.AddWithValue("$x", landmark.Pos.X);
@@ -101,7 +106,8 @@ WHERE x = $x
 			command.Parameters.AddWithValue("$z", landmark.Pos.Z);
 
 			command.Parameters.AddWithValue("$label", landmark.Label);
-			command.Parameters.AddWithValue("$type", landmark.Type);
+			command.Parameters.AddWithValue("$color", landmark.Color);
+			command.Parameters.AddWithValue("$icon", landmark.Icon);
 			command.Parameters.AddWithValue("$creator_id", landmark.CreatorId);
 			var reader = command.ExecuteReader();
 			return !reader.HasRows;
@@ -117,15 +123,16 @@ WHERE x = $x
 		try {
 			using var command = conn.CreateCommand();
 			command.CommandText = @$"
-INSERT OR REPLACE INTO {TableName}
-VALUES ($x, $y, $z, $label, $type, $creator_id)
+INSERT INTO {TableName}
+VALUES ($x, $y, $z, $label, $color, $icon, $creator_id)
 ";
 			command.Parameters.AddWithValue("$x", landmark.Pos.X);
 			command.Parameters.AddWithValue("$y", landmark.Pos.Y);
 			command.Parameters.AddWithValue("$z", landmark.Pos.Z);
 
 			command.Parameters.AddWithValue("$label", landmark.Label);
-			command.Parameters.AddWithValue("$type", landmark.Type);
+			command.Parameters.AddWithValue("$color", landmark.Color);
+			command.Parameters.AddWithValue("$icon", landmark.Icon);
 
 			command.Parameters.AddWithValue("$creator_id", landmark.CreatorId);
 			var rowsAffected = command.ExecuteNonQuery();
@@ -190,9 +197,10 @@ WHERE creator_id = $creator_id
 				var y = reader.GetInt32(1);
 				var z = reader.GetInt32(2);
 				var label = reader.GetString(3);
-				var type = reader.GetString(4);
+				var color = reader.GetString(4);
+				var icon = reader.GetString(5);
 				var landmark = new Landmark {
-					Pos = new Vec3i(x, y, z), Label = label, Type = type
+					Pos = new Vec3i(x, y, z), Label = label, Color = color, Icon = icon
 				};
 				landmarks.Add(landmark);
 			}
@@ -211,16 +219,18 @@ WHERE creator_id = $creator_id
 				var y = reader.GetInt32(1);
 				var z = reader.GetInt32(2);
 				var label = reader.GetString(3);
-				var type = reader.GetString(4);
+				var color = reader.GetString(4);
+				var icon = reader.GetString(5);
 				writer.WriteObject(() => {
 					writer.WriteObject("geometry",
 									() => {
-										writer.WriteArray("coordinates", x, z).WriteKeyValue("type", "Point");
+										writer.WriteArray("coordinates", x, -z).WriteKeyValue("type", "Point");
 									})
 							.WriteObject("properties",
 									() => {
 										writer.WriteKeyValue("label", label)
-												.WriteKeyValue("type", type)
+												.WriteKeyValue("color", color)
+												.WriteKeyValue("icon", icon)
 												.WriteKeyValue("z", y);
 									})
 							.WriteKeyValue("type", "Feature");
@@ -228,12 +238,13 @@ WHERE creator_id = $creator_id
 			});
 
 	private TextCommandResult LandmarkAddHandler(TextCommandCallingArgs args) {
-		var pos = args.Caller.Pos.AsBlockPos.ToLocalPosition(serverAPI);
-		var type = args[0] as string;
-		var label = args[1] as string;
+		var pos = args.Caller.Pos.AsVec3i;
+		var color = args[0] as string;
+		var icon = args[1] as string;
+		var label = args[2] as string;
 		var creatorId = args.Caller.Player.PlayerUID;
 		var res = ProcessFeature(new Landmark {
-			Pos = pos, Type = type, Label = label, CreatorId = creatorId
+			Pos = pos, Color = color, Icon = icon, Label = label, CreatorId = creatorId
 		});
 		return res.IsGood
 				? res.Good
@@ -276,8 +287,9 @@ WHERE creator_id = $creator_id
 		foreach (var landmark in landmarks) {
 			var pos = landmark.Pos;
 			var label = landmark.Label;
-			var type = landmark.Type;
-			response.Append($"{pos} Label: \"{label}\" Type: \"{type}\"\n");
+			var color = landmark.Color;
+			var icon = landmark.Icon;
+			response.Append($"{pos} Label: \"{label}\" Color: \"{color}\" Icon: \"{icon}\"\n");
 		}
 		return TextCommandResult.Success(response.ToString());
 	}

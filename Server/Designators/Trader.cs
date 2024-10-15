@@ -14,8 +14,7 @@ public record Trader {
 
 	public Trader(EntityTrader trader) {
 		EntityId = trader.EntityId;
-		var api = trader.Api;
-		Pos = trader.Pos.AsBlockPos.ToLocalPosition(api);
+		Pos = trader.Pos.XYZInt;
 		Name = trader.WatchedAttributes.GetTreeAttribute("nametag")?.GetString("name");
 		Wares = trader.Code.EndVariant();
 	}

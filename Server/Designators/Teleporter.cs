@@ -12,9 +12,8 @@ public record Teleporter {
 	public Teleporter() { }
 
 	public Teleporter(BlockEntityTeleporterBase teleporter) {
-		var api = teleporter.Api;
-		Start = teleporter.Pos.ToLocalPosition(api);
-		End = teleporter.Target().ToLocalPosition(api);
+		Start = teleporter.Pos.AsVec3i;
+		End = teleporter.Target().AsVec3i;
 		Label = "";
 		Tag = "";
 	}

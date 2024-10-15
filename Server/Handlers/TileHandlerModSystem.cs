@@ -54,6 +54,48 @@ CREATE TABLE IF NOT EXISTS {TableName}
 
 	public override Result<bool> Delete(Tile toDelete) => default;
 
+	public void AddLotsOfShardsToTiles(List<ChunkShard> shards) {
+		foreach (var shard in shards) {
+			var shardX = shard.ChunkCoords.X;
+			var shardY = shard.ChunkCoords.Y;
+
+			var tileX = shardX / tileResampleSize - baseChunkOffsetX;
+			var tileY = shardY / tileResampleSize - baseChunkOffsetY;
+
+			var scaleLevel = config.TileMaxScaleLevel;
+
+			var tile = new Tile(scaleLevel, tileX, tileY);
+		
+			var res = GetTile(tile);
+			if (res.IsException) {
+				logger.Error(res.Exception);
+				if (res.Exception.InnerException is { } inner)
+					logger.Error(inner);
+				return;
+			}
+			// the tile didnt exist
+			if (!res.Good)
+				tile.Texture = new SKBitmap(tileSize, tileSize, true);
+
+			var overlayShard = OverlayShard(tile, shard);
+			if (overlayShard is { } overlayRes) {
+				logger.Error(overlayRes);
+				if (overlayRes.InnerException is { } inner)
+					logger.Error(inner);
+				return;
+			}
+		
+
+			var writeTile = WriteTile(tile);
+		
+			if (writeTile is { } writeRes) {
+				logger.Error(writeRes);
+				if (writeRes.InnerException is { } inner)
+					logger.Error(inner);
+			}
+		}
+	}
+	
 	public void AddShardToTile(ChunkShard shard) {
 		var shardX = shard.ChunkCoords.X;
 		var shardY = shard.ChunkCoords.Y;
@@ -64,7 +106,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		var scaleLevel = config.TileMaxScaleLevel;
 
 		var tile = new Tile(scaleLevel, tileX, tileY);
-
+		
 		var res = GetTile(tile);
 		if (res.IsException) {
 			logger.Error(res.Exception);
@@ -76,13 +118,18 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		if (!res.Good)
 			tile.Texture = new SKBitmap(tileSize, tileSize, true);
 
-		if (OverlayShard(tile, shard) is { } overlayRes) {
+		var overlayShard = OverlayShard(tile, shard);
+		if (overlayShard is { } overlayRes) {
 			logger.Error(overlayRes);
 			if (overlayRes.InnerException is { } inner)
 				logger.Error(inner);
 			return;
 		}
-		if (WriteTile(tile) is { } writeRes) {
+		
+
+		var writeTile = WriteTile(tile);
+		
+		if (writeTile is { } writeRes) {
 			logger.Error(writeRes);
 			if (writeRes.InnerException is { } inner)
 				logger.Error(inner);

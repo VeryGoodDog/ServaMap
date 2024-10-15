@@ -1,32 +1,41 @@
 // Thank you Drakker for pretty much everything here.
 // I could only figure out what to get rid of.
 
+const dataFolder = '/data';
+
 // Get the data we need for the URL copy/paste handling
-var title = document.title;
+const title = document.title;
 var adr = document.location.href.replace(/\?.*/, "");
+
+var worldOriginOffset = null;
+fetch(dataFolder + '/worldOriginOffset.json')
+    .then(res => res.json())
+    .then(json => {
+        worldOriginOffset = json.worldOriginOffset;
+        console.log(worldOriginOffset);
+    });
 
 const args = new URLSearchParams(document.location.href.replace(/.*\?/, ''));
 
 var cx = 0;
 var cy = 0;
 var zm = 6;
-var dataFolder = '/data';
 
-if (args.has('x')) {
-    cx = args.get('x')
-}
-if (args.has('y')) {
-    cy = args.get('y')
-}
-if (args.has('zoom')) {
-    zm = args.get('zoom')
-}
+// if (args.has('x')) {
+//     cx = args.get('x')
+// }
+// if (args.has('y')) {
+//     cy = args.get('y')
+// }
+// if (args.has('zoom')) {
+//     zm = args.get('zoom')
+// }
 
 // Find the inspector
-var inspector = document.getElementById('status');
+const inspector = document.getElementById('status');
 
 // Path for all the icons, layers with multiple icons use a dict
-var icons = {
+const icons = {
     'Traders': 'icons/trader.svg',
     'Translocators': 'icons/spiral.svg',
     'Landmarks': {
@@ -36,18 +45,18 @@ var icons = {
 }
 
 // Icons color references table by icon type
-var colorsRef = {
+const colorsRef = {
     'Traders': {
-        'Artisan trader': [0, 240, 240],
-        'Building materials trader': [255, 0, 0],
-        'Clothing trader': [0, 128, 0],
-        'Commodities trader': [128, 128, 128],
-        'Agriculture trader': [200, 192, 128],
-        'Foods trader': [200, 192, 128],
-        'Furniture trader': [255, 128, 0],
-        'Luxuries trader': [0, 0, 255],
-        'Survival goods trader': [255, 255, 0],
-        'Treasure hunter trader': [160, 0, 160],
+        'artisan': [0, 240, 240],
+        'buildmaterials': [255, 0, 0],
+        'clothing': [0, 128, 0],
+        'commodities': [128, 128, 128],
+        'agriculture': [200, 192, 128],
+        'foods': [200, 192, 128],
+        'furniture': [255, 128, 0],
+        'luxuries': [0, 0, 255],
+        'survivalgoods': [255, 255, 0],
+        'treasurehunter': [160, 0, 160],
         'unknown': [48, 48, 48]
     },
     'Translocators': {
@@ -61,12 +70,12 @@ var colorsRef = {
     }
 }
 
-var toolsRef = {
+const toolsRef = {
     'zoomIn': {
         'id': 'zoomIn',
         'icon': '+',
         'title': 'Zoom in',
-        'callback': function (e) {
+        'callback': function (event) {
             view.animate({zoom: view.getConstrainedZoom(view.getZoom() + 1), duration: 100});
         }
     },
@@ -74,7 +83,7 @@ var toolsRef = {
         'id': 'zoomOut',
         'icon': '−',
         'title': 'Zoom out',
-        'callback': function (e) {
+        'callback': function (event) {
             view.animate({zoom: view.getConstrainedZoom(view.getZoom() - 1), duration: 100});
         }
     },
@@ -82,7 +91,7 @@ var toolsRef = {
         'id': 'origin',
         'icon': '🧭',
         'title': 'Move and zoom to the server spawn (H)',
-        'callback': function (e) {
+        'callback': function (event) {
             goToCoords('0,0');
         }
     },
@@ -90,7 +99,7 @@ var toolsRef = {
         'id': 'goToCoords',
         'icon': '🔍',
         'title': 'Move and zoom to coordinates (G)',
-        'callback': function (e) {
+        'callback': function (event) {
             poper.createPopup('gps');
         }
     },
@@ -98,13 +107,13 @@ var toolsRef = {
         'id': 'goToLandmarks',
         'icon': '🏛',
         'title': 'Move and zoom to selected landmark (L)',
-        'callback': function (e) {
+        'callback': function (event) {
             poper.createPopup('landmarks');
         }
     }
 }
 
-var popupsRef = {
+const popupsRef = {
     'gps': {
         'title': 'Move to coordinates',
         'css': ['c', 'gps'],
@@ -135,7 +144,7 @@ var popupsRef = {
             'Ok': {
                 'title': 'Go to coordinates',
                 'default': true,
-                'callback': function (e) {
+                'callback': function (event) {
                     if (goToCoords(document.getElementById('input_data').value.trim())) {
                         poper.destroyPopup('gps');
                     }
@@ -143,7 +152,7 @@ var popupsRef = {
             },
             'Cancel': {
                 'title': 'Cancel',
-                'callback': function (e) {
+                'callback': function (event) {
                     poper.destroyPopup('gps');
                 }
             }
@@ -171,7 +180,7 @@ var popupsRef = {
             'Ok': {
                 'title': 'Go to landmark',
                 'default': true,
-                'callback': function (e) {
+                'callback': function (event) {
                     if (goToCoords(document.getElementById('select_data').value.trim())) {
                         poper.destroyPopup('landmarks');
                     }
@@ -179,7 +188,7 @@ var popupsRef = {
             },
             'Cancel': {
                 'title': 'Cancel',
-                'callback': function (e) {
+                'callback': function (event) {
                     poper.destroyPopup('landmarks');
                 }
             }
@@ -192,7 +201,7 @@ var popupsRef = {
         'controls': {
             'Close': {
                 'title': 'Close',
-                'callback': function (e) {
+                'callback': function (event) {
                     poper.destroyPopup('translocator');
                 }
             }
@@ -205,7 +214,7 @@ var popupsRef = {
         'controls': {
             'Close': {
                 'title': 'Close',
-                'callback': function (e) {
+                'callback': function (event) {
                     poper.destroyPopup('trader');
                 }
             }
@@ -427,6 +436,10 @@ function goToCoords(where) {
     return false
 }
 
+function absoluteToRelative(abs) {
+    return [abs[0] - worldOriginOffset[0] + 31, -abs[1] - worldOriginOffset[2] + 31];
+}
+
 /* ######################### LayerSwitcher ######################### */
 class LayerSwitcher {
     constructor(elementId) {
@@ -566,10 +579,10 @@ class LayerSwitcher {
     }
 }
 
-var switcher = new LayerSwitcher('layerSwitcher')
+const switcher = new LayerSwitcher('layerSwitcher')
 
 /* ######################### Highlight styles ######################### */
-var highlightStyleTranslocator = [
+const highlightStyleTranslocator = [
     new ol.style.Style({
         stroke: new ol.style.Stroke({
             color: '#ddaaff',
@@ -589,17 +602,19 @@ var highlightStyleTranslocator = [
     })
 ];
 
-var highlightStyleTrader = function (feature) {
+const highlightStyleTrader = function (feature) {
+    let wares = feature.get('wares');
+    let color = colorsRef['Traders'][wares] || colorsRef['Traders']['unknown'];
     return new ol.style.Style({
         image: new ol.style.Icon({
-            color: colorsRef['Traders'][feature.get('wares')].map((val, i) => Math.min(Math.max(val * 1.5, 64), 255)),
+            color: color.map((val, i) => Math.min(Math.max(val * 1.5, 64), 255)),
             src: icons['Traders'],
         })
     })
 }
 
 /* ######################### Default layer styles ######################### */
-var vsLandmarks = new ol.layer.Vector({
+const vsLandmarks = new ol.layer.Vector({
     name: 'Landmarks',
     minZoom: 2,
     source: new ol.source.Vector({
@@ -607,16 +622,19 @@ var vsLandmarks = new ol.layer.Vector({
         format: new ol.format.GeoJSON(),
     }),
     style: function (feature) {
+        let color = feature.get('color');
+        let icon = feature.get('icon');
+        let label = feature.get('label');
         return new ol.style.Style({
             zIndex: 1000,
             image: new ol.style.Icon({
-                color: colorsRef['Landmarks'][feature.get('type')],
+                color: color,
                 opacity: 1,
-                src: icons['Landmarks'][feature.get('type')],
+                src: `icons/${icon}.svg`,
             }),
             text: new ol.style.Text({
                 font: 'bold ' + String(localStorage.labelSize) + 'px "arial narrow", "sans serif"',
-                text: feature.get('label'),
+                text: label,
                 textAlign: 'left',
                 textBaseline: 'bottom',
                 offsetX: 10,
@@ -627,7 +645,7 @@ var vsLandmarks = new ol.layer.Vector({
     }
 });
 
-var vsTraders = new ol.layer.Vector({
+const vsTraders = new ol.layer.Vector({
     name: 'Traders',
     minZoom: 3,
     source: new ol.source.Vector({
@@ -635,9 +653,10 @@ var vsTraders = new ol.layer.Vector({
         format: new ol.format.GeoJSON(),
     }),
     style: function (feature) {
+        let wares = feature.get('wares');
         return new ol.style.Style({
             image: new ol.style.Icon({
-                color: colorsRef['Traders'][feature.get('wares')],
+                color: colorsRef['Traders'][wares],
                 opacity: 1,
                 src: icons['Traders'],
             }),
@@ -645,7 +664,7 @@ var vsTraders = new ol.layer.Vector({
     }
 });
 
-var vsTranslocators = new ol.layer.Vector({
+const vsTranslocators = new ol.layer.Vector({
     name: 'Translocators',
     minZoom: 3,
     source: new ol.source.Vector({
@@ -653,12 +672,7 @@ var vsTranslocators = new ol.layer.Vector({
         format: new ol.format.GeoJSON(),
     }),
     style: function (feature) {
-        var tlCol = colorsRef['Translocators']['Translocator'];
-        if (feature.get('tag') === 'SPAWN') {
-            tlCol = colorsRef['Translocators']['Spawn Translocator'];
-        } else if (feature.get('label') !== undefined && feature.get('label').length > 0) {
-            tlCol = colorsRef['Translocators']['Named Translocator'];
-        }
+        let color = feature.get('color')
         return [
             new ol.style.Style({
                 stroke: new ol.style.Stroke({
@@ -668,7 +682,7 @@ var vsTranslocators = new ol.layer.Vector({
             }),
             new ol.style.Style({
                 image: new ol.style.Icon({
-                    color: tlCol,
+                    color: color,
                     opacity: 1,
                     src: icons['Translocators']
                 }),
@@ -681,14 +695,14 @@ var vsTranslocators = new ol.layer.Vector({
     }
 });
 
-var vsWorld = new ol.layer.Tile({
+const vsWorld = new ol.layer.Tile({
     name: 'World',
     source: new ol.source.XYZ({
         interpolate: false,
         wrapx: false,
         tileGrid: new ol.tilegrid.TileGrid({
-            origin: [0, 0],
-            resolutions: [32, 16, 8, 4, 2, 1],
+            origin: [-255.5, 255.5],
+            resolutions: [16, 8, 4, 2, 1],
             tileSize: [256, 256]
         }),
         url: dataFolder + '/world/{z}_{x}_{y}.png'
@@ -696,9 +710,10 @@ var vsWorld = new ol.layer.Tile({
 })
 
 /* ######################### Controllers ######################### */
-var mousePos = new ol.control.MousePosition({
+const mousePos = new ol.control.MousePosition({
     coordinateFormat: function (coordinate) {
-        return ol.coordinate.toStringXY([coordinate[0], -coordinate[1]], 0);
+        const relCoord = absoluteToRelative(coordinate)
+        return ol.coordinate.toStringXY([relCoord[0], relCoord[1]], 0);
     },
     className: 'coords',
     target: document.getElementById('mousePos'),
@@ -706,14 +721,14 @@ var mousePos = new ol.control.MousePosition({
 });
 
 /* ######################### Map definition and functions ######################### */
-var view = new ol.View({
+const view = new ol.View({
     center: [cx, cy],
     constrainResolution: true,
     zoom: zm,
-    resolutions: [32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125]
+    resolutions: [32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125, 0.0625]
 });
 
-var map = new ol.Map({
+const map = new ol.Map({
     target: 'map',
     controls: [mousePos],
     layers: [
@@ -725,10 +740,10 @@ var map = new ol.Map({
     view: view
 });
 
-map.on("moveend", function () {
-    newHref = adr + "?x=" + Math.round(map.getView().getCenter()[0]) + "&y=" + Math.round(map.getView().getCenter()[1]) + "&zoom=" + map.getView().getZoom();
-    window.history.pushState("pos", title, newHref);
-});
+// map.on("moveend", function () {
+//     newHref = adr + "?x=" + Math.round(map.getView().getCenter()[0]) + "&y=" + Math.round(map.getView().getCenter()[1]) + "&zoom=" + map.getView().getZoom();
+//     window.history.pushState("pos", title, newHref);
+// });
 
 
 var selectedTL = undefined;
@@ -789,15 +804,16 @@ map.on('pointermove', function (e) {
 });
 
 // Handle map clicks to display popups and other extended functionalities
-map.on('singleclick', function (e) {
-    map.forEachFeatureAtPixel(e.pixel, function (f, l) {
-        if (l.get('name') === 'Translocators') {
-            let coords = f.getGeometry().flatCoordinates;
-            let dst1 = Math.abs(coords[0] - e.coordinate[0] + coords[1] - e.coordinate[1]);
-            let dst2 = Math.abs(coords[2] - e.coordinate[0] + coords[3] - e.coordinate[1]);
+map.on('singleclick', function (event) {
+    map.forEachFeatureAtPixel(event.pixel, function (feature, layer) {
+        if (layer.get('name') === 'Translocators') {
+            let absCoords = feature.getGeometry().flatCoordinates;
+            const coords = absoluteToRelative(absCoords);
+            let dst1 = Math.abs(coords[0] - event.coordinate[0] + coords[1] - event.coordinate[1]);
+            let dst2 = Math.abs(coords[2] - event.coordinate[0] + coords[3] - event.coordinate[1]);
             let coordsString = '';
-            let coordsDst1 = ((coords[0])) + ' 110 ' + (-coords[1]);
-            let coordsDst2 = ((coords[2])) + ' 110 ' + (-coords[3]);
+            let coordsDst1 = (coords[0]) + ' 110 ' + (coords[1]);
+            let coordsDst2 = (coords[2]) + ' 110 ' + (coords[3]);
             if (dst1 < dst2) {
                 coordsString += coordsDst1;
                 coordsString2 = coordsDst2;
@@ -806,7 +822,7 @@ map.on('singleclick', function (e) {
                 coordsString2 = coordsDst1;
             }
             // Was the user holding shift?
-            if (e.originalEvent.shiftKey) {
+            if (event.originalEvent.shiftKey) {
                 // Zoom to the other end
                 goToCoords(coordsString2.replace(/ 110 /, ','));
             } else {
@@ -828,9 +844,10 @@ map.on('singleclick', function (e) {
                 poper.createPopup('translocator', show = true, params = {'elements': elements});
             }
             return true
-        } else if (l.get('name') === 'Traders') {
-            let coords = f.getGeometry().flatCoordinates;
-            let color = '#' + colorsRef['Traders'][f.get('wares')].map(i => i.toString(16).padStart(2, "0")).join("");
+        } else if (layer.get('name') === 'Traders') {
+            const absCoords = feature.getGeometry().flatCoordinates;
+            const coords = absoluteToRelative(absCoords); 
+            let color = '#' + colorsRef['Traders'][feature.get('wares')].map(i => i.toString(16).padStart(2, "0")).join("");
             var elements = {
                 'description1': {
                     'type': 'p',
@@ -838,7 +855,7 @@ map.on('singleclick', function (e) {
                 },
                 'description2': {
                     'type': 'p',
-                    'content': `/waypoint addati trader ${(coords[0])} 110 ${-coords[1]} false ${color.toUpperCase()} ${f.get('name')} the ${f.get('wares').toLowerCase()} trader`
+                    'content': `/waypoint addati trader ${coords[0]} 110 ${coords[1]} false ${color.toUpperCase()} ${feature.get('name')} the ${feature.get('wares').toLowerCase()} trader`
                 }
             }
             poper.createPopup('trader', show = true, params = {'elements': elements});

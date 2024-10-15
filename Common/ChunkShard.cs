@@ -39,4 +39,11 @@ public record ChunkShard {
 	// This is ignored because it's set by the server not the client.
 	[ProtoIgnore]
 	public string GeneratingPlayerId { get; set; }
+	
+	public  int TextureHash() {
+		int textureHash = 0;
+		for (int i = 0; i < ShardImage.Length; i += 4)
+			textureHash ^= ShardImage[i];
+		return textureHash;
+	}
 }
