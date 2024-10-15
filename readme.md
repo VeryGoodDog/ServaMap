@@ -11,7 +11,7 @@ It is still a work in progress and is missing some core features. It does have:
 - Chunk tile generation.
 - The ability to export all tiles in one large image.
 - Tile resampling.
-- Webserver hosting, the mod does not automatically host the online map.
+- Webserver hosting, the mod automatically hosts the online map.
 
 It is currently missing:
 

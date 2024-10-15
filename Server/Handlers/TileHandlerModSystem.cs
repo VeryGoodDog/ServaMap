@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 using SkiaSharp;
@@ -36,9 +38,9 @@ public class TileHandlerModSystem : DatabaseHandlerModSystem<Tile> {
 			command.CommandText = @$"
 CREATE TABLE IF NOT EXISTS {TableName}
 (
-    x,
-    y,
-    scale_level,
+    x NOT NULL,
+    y NOT NULL,
+    scale_level NOT NULL,
     UNIQUE(x, y, scale_level)
 )
 ";
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
 	public override Result<bool> Delete(Tile toDelete) => default;
 
 	public void AddLotsOfShardsToTiles(List<ChunkShard> shards) {
+		var tilesToWrite = new List<Tile>();
 		foreach (var shard in shards) {
 			var shardX = shard.ChunkCoords.X;
 			var shardY = shard.ChunkCoords.Y;
@@ -64,38 +67,37 @@ CREATE TABLE IF NOT EXISTS {TableName}
 
 			var scaleLevel = config.TileMaxScaleLevel;
 
-			var tile = new Tile(scaleLevel, tileX, tileY);
-		
-			var res = GetTile(tile);
-			if (res.IsException) {
-				logger.Error(res.Exception);
-				if (res.Exception.InnerException is { } inner)
-					logger.Error(inner);
-				return;
+			var tileIndex =
+					tilesToWrite.FindIndex(other => other.X == tileX && other.Y == tileY && other.ScaleLevel == scaleLevel);
+			Tile tile = null;
+			if (tileIndex != -1) {
+				tile = tilesToWrite[tileIndex];
 			}
-			// the tile didnt exist
-			if (!res.Good)
-				tile.Texture = new SKBitmap(tileSize, tileSize, true);
+			else {
+				tile = new Tile(scaleLevel, tileX, tileY);
+				var res = GetTile(tile);
+				if (res.IsException) {
+					logger.Error(res.Exception);
+					if (res.Exception.InnerException is { } inner)
+						logger.Error(inner);
+					return;
+				}
+				tilesToWrite.Add(tile);
+			}
 
 			var overlayShard = OverlayShard(tile, shard);
 			if (overlayShard is { } overlayRes) {
 				logger.Error(overlayRes);
 				if (overlayRes.InnerException is { } inner)
 					logger.Error(inner);
-				return;
+				continue;
 			}
-		
 
-			var writeTile = WriteTile(tile);
-		
-			if (writeTile is { } writeRes) {
-				logger.Error(writeRes);
-				if (writeRes.InnerException is { } inner)
-					logger.Error(inner);
-			}
 		}
+		
+		WriteLotsOfTiles(tilesToWrite);
 	}
-	
+
 	public void AddShardToTile(ChunkShard shard) {
 		var shardX = shard.ChunkCoords.X;
 		var shardY = shard.ChunkCoords.Y;
@@ -106,7 +108,7 @@ CREATE TABLE IF NOT EXISTS {TableName}
 		var scaleLevel = config.TileMaxScaleLevel;
 
 		var tile = new Tile(scaleLevel, tileX, tileY);
-		
+
 		var res = GetTile(tile);
 		if (res.IsException) {
 			logger.Error(res.Exception);
@@ -114,9 +116,6 @@ CREATE TABLE IF NOT EXISTS {TableName}
 				logger.Error(inner);
 			return;
 		}
-		// the tile didnt exist
-		if (!res.Good)
-			tile.Texture = new SKBitmap(tileSize, tileSize, true);
 
 		var overlayShard = OverlayShard(tile, shard);
 		if (overlayShard is { } overlayRes) {
@@ -125,10 +124,9 @@ CREATE TABLE IF NOT EXISTS {TableName}
 				logger.Error(inner);
 			return;
 		}
-		
 
 		var writeTile = WriteTile(tile);
-		
+
 		if (writeTile is { } writeRes) {
 			logger.Error(writeRes);
 			if (writeRes.InnerException is { } inner)
@@ -229,8 +227,10 @@ WHERE x = $x AND y = $y and scale_level = $scale_level
 
 			var reader = command.ExecuteReader();
 			// new tile!
-			if (!reader.HasRows)
+			if (!reader.HasRows) {
+				tile.Texture = new SKBitmap(tileSize, tileSize, true);
 				return false;
+			}
 
 			var path = Path.Combine(tilePath, tile.TilePath);
 			using var stream = new SKFileStream(path);
@@ -292,7 +292,6 @@ WHERE x = $x AND y = $y and scale_level = $scale_level
 				throw new NullReferenceException("Tile texture is null!");
 			if (tile.Texture.DrawsNothing)
 				return null;
-
 			var path = Path.Combine(tilePath, tile.TilePath);
 
 			using var file = File.Open(path, FileMode.OpenOrCreate);
@@ -319,11 +318,42 @@ VALUES ($x, $y, $scale_level)
 		}
 	}
 
+	public Exception WriteLotsOfTiles(List<Tile> tiles) {
+		var tilesToWrite = new List<Tile>();
+
+		foreach (var tile in tiles) {
+			if (tile.Texture is null)
+				if (tile.Texture.DrawsNothing)
+					continue;
+			try {
+				var path = Path.Combine(tilePath, tile.TilePath);
+
+				using var file = File.Open(path, FileMode.OpenOrCreate);
+				tile.Texture.Encode(file, SKEncodedImageFormat.Png, 100);
+				tilesToWrite.Add(tile);
+			}
+			catch (Exception) { }
+		}
+		
+		// this is gross but i dont know how else to make this a batch operation.
+		var commandText = new StringBuilder();
+		foreach (var tile in tilesToWrite) {
+			commandText.Append($"INSERT OR REPLACE INTO {TableName} VALUES ({tile.X}, {tile.Y}, {tile.ScaleLevel}); ");
+			if (tile.ScaleLevel > 0)
+				AddSuperTileToResample(tile);
+		}
+
+		using var command = conn.CreateCommand();
+		command.CommandText = commandText.ToString();
+		command.ExecuteNonQuery();
+		return null;
+	}
+
 	private void AddSuperTileToResample(Tile tile) {
 		var superScale = tile.ScaleLevel - 1;
 		var x = tile.X == -1 ? -1 : (tile.X / 2);
 		var y = tile.Y == -1 ? -1 : (tile.Y / 2);
-		
+
 		var superTile = new Tile(superScale, x, y);
 		if (!toResample.Contains(superTile))
 			toResample.Enqueue(superTile);
@@ -338,7 +368,6 @@ VALUES ($x, $y, $scale_level)
 			using var command = conn.CreateCommand();
 			command.CommandText = $@"
 SELECT * FROM {TableName}
-WHERE scale_level = 0
 ";
 
 			var reader = command.ExecuteReader();

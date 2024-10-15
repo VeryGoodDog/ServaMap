@@ -5,8 +5,7 @@ The server is the heart of the map. It...
 3. hosts the web viewer application.
 
 Each connected client sends the server the shards it produces.
-To track chunks, a DB stores which chunk shards it has, and when they were
-generated.
+To track chunks a DB stores which chunk shards it has, and a hash of the texture.
 
 After that, the server combines them.
 

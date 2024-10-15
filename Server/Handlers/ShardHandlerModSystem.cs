@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 using ProtoBuf;
 
@@ -28,15 +30,20 @@ public class ShardHandlerModSystem : FeatureDatabaseHandlerModSystem<ChunkShard>
 				.RegisterMessageType<List<ChunkShard>>()
 				.SetMessageHandler((IServerPlayer serverPlayer, List<ChunkShard> shards) => {
 					logger.Notification($"{serverPlayer.PlayerName} sent: {shards.Count} chunks");
+					logger.Debug($"Received {shards.Count} chunks");
+					var shardsToAdd = new List<ChunkShard>();
 					foreach (var chunkShard in shards) {
 						chunkShard.GenerationTime = DateTime.UtcNow;
 						chunkShard.GeneratingPlayerId = serverPlayer.PlayerUID;
+						
 						var res = ProcessFeature(chunkShard);
+						
 						if (res.IsException)
 							logger.Error(res.Exception);
 						else if (res.Good)
 							shardsToAdd.Add(chunkShard);
 					}
+					logger.Debug($"Adding {shards.Count} chunks");
 					tileHandlerModSystem.AddLotsOfShardsToTiles(shardsToAdd);
 				});
 
@@ -125,8 +132,6 @@ WHERE x = $x
 ";
 			command.Parameters.AddWithValue("$x", shard.ChunkCoords.X);
 			command.Parameters.AddWithValue("$y", shard.ChunkCoords.Y);
-
-			command.Parameters.AddWithValue("$new_generation_time", shard.GenerationTime);
 			command.Parameters.AddWithValue("$image_hash", shard.TextureHash());
 			var reader = command.ExecuteReader();
 			// This is a totally new shard.
